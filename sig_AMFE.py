@@ -18,14 +18,18 @@ class AMFE:
     def add_forward_r(self, ends=[1, 5, 10, 20, 40],  start=1):
         for end in ends:
             col_name = 'forward_r_' + str(end)
-            self.data = self.data \
-                .withColumn(col_name,
-                            f.sum(f.log(f.col(self.r) + 1)).over(
-                                Window.partitionBy(self.name).orderBy(self.time).rowsBetween(start, end))) \
-                .withColumn(col_name, f.exp(f.col(col_name)) - 1)
+            window_gen_r = Window.partitionBy(self.name).orderBy(self.time).rowsBetween(start, end)
+            window_select_r = Window.partitionBy(self.name).orderBy(self.time)
+            df = self.data \
+                .withColumn(col_name, f.sum(f.log(f.col(self.r) + 1)).over(window_gen_r)) \
+                .withColumn(col_name, f.exp(f.col(col_name)) - 1)\
+                .withColumn('row_number', f.row_number().over(window_select_r))\
+                .filter(f.col('row_number') % (end-start+1) == 0)\
+                .select(self.name, self.time, col_name)
+            self.data=self.data.join(df, on=[self.name, self.time], how='outer')
         return self.data
 
-    def add_sig_variations(self, diff_lag=1, avg_lookbacks=(5, 10, 20, 40)):
+    def add_sig_variations(self,  avg_lookbacks=[5, 10, 20, 40], diff_lag=1):
         for sig_col in self.sig_cols:
             # generate change in signals.
             self.data = self.data.withColumn('value_lagged', f.lag(f.col(sig_col), offset=diff_lag)
@@ -44,9 +48,7 @@ class AMFE:
             for i in [col for col in self.data.columns if any(sig in col for sig in self.sig_cols)]:
                 sigeva = PortforlioAnalysis(self.data, self.time, sig=i, r=j)
                 univariate_r = sigeva.univariate_portfolio_r(ntile, weight)
-                r=univariate_r.toPandas().sort_values(self.time)\
-                    .groupby(['sig_rank', 'weight_scheme']).apply(lambda x: x[::10]).reset_index(drop=True)
-                single_sort = sigeva.sort_return(r)
+                single_sort = sigeva.sort_return(univariate_r)
                 single_sort2 = pd.concat([single_sort], keys=[j], names=['cum_r'])
                 single_sort3 = pd.concat([single_sort2], keys=[i], names=['sig'])
                 perfs.append(single_sort3)
