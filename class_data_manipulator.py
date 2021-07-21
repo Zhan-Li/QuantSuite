@@ -14,7 +14,7 @@ import empyrical
 from pandas_profiling import ProfileReport
 import pandas_market_calendars as mcal
 from typing import List
-import utilities as utils
+import class_utilities as utils
 
 
 class DataManipulator:
@@ -120,4 +120,30 @@ class DataManipulator:
             .withColumn(r, (f.col(price)*100 - f.col('value_lagged')*100 - 2*fee)/(f.col('value_lagged')*100 )) \
             .drop('value_lagged')
         return self
+
+    def add_rsd(self, value, start, end,  rsd = 'rsd'):
+        """
+        relative standard deviation
+        """
+        self.data  = self.data\
+            .withColumn('mean', f.mean(value).over(self.w(start, end))) \
+            .withColumn('std', f.stddev(value).over(self.w(start, end)))\
+            .withColumn(rsd, f.col('std')/f.col('mean'))\
+            .drop('mean', 'std')
+        self.data = self.filter(self.data, start, end)
+        return self
+
+    def add_skewness(self, value, start, end, skewness='skewness'):
+        self.data  = self.data\
+            .withColumn(skewness, f.skewness(value))
+        self.data = self.filter(self.data, start, end)
+        return self
+
+    def add_kurtosis(self, value, start, end, kurtosis='kurtosis'):
+        self.data  = self.data\
+            .withColumn(kurtosis, f.kurtosis(value))
+        self.data = self.filter(self.data, start, end)
+        return self
+
+
 
