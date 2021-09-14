@@ -70,60 +70,49 @@ class PortfolioAnalysis:
     def get_IC(self):
         return self.data.agg(f.corr(self.r, self.sig).alias('correlation'))
 
-    def gen_portr(self, ntile=None, n=None, cond_var=None, cond_ntile=None, total_position=0, commission=0, turnover=0) -> PandasDataFrame:
+    def gen_portr(self, ntile=None, cond_var=None, cond_ntile=None, dependent_sort= True,
+                  total_position=0, commission=0, turnover=0) -> PandasDataFrame:
         """
         ntile: n quantile portfolio formation
-        n: n stocks in the long and short position
         cond_var: conditional variable for double sorting
         total_position: total $$ to invest
         commission: broker commission per transaction
         turnover: portfolio turover rate.
         Raw returns for equal‐ and value-weighted portfolios by ntiles and freq (day, month, week, or year)
         """
-        # generate ranks
-        if ntile is not None and n is None:
-            ranked = self.data \
-                .withColumn('sig_rank',
-                            f.when(f.col(self.sig).isNull(), np.nan).otherwise(
-                            f.ntile(ntile).over(Window.partitionBy(self.time).orderBy(self.sig))))\
-                .withColumn('sig_rank', f.col('sig_rank').cast(IntegerType()))
-            rank_high = ntile
-            rank_low = 1
-        elif n is not None and ntile is None:
-            ranked = self.data \
-                .withColumn('rank_asc', f.rank().over(Window.partitionBy(self.time).orderBy(self.sig))) \
-                .withColumn('rank_desc', f.rank().over(Window.partitionBy(self.time).orderBy(f.col(self.sig).desc()))) \
-                .withColumn('sig_rank', f.when(f.col('rank_asc') <= n, 'low').when(f.col('rank_desc') <= n, 'high')) \
-                .filter((f.col('sig_rank') == 'high') | (f.col('sig_rank') == 'low'))
-            rank_high = 'high'
-            rank_low = 'low'
-        else:
-            raise Exception('At lease one and only one of ntile and n needs to be given.')
-        # generate values by ranks and conditional variable
+        # generate rank for conditional var
         if cond_var is not None and cond_ntile is not None:
-            ranked = ranked.withColumn('cond_rank',
+            cond_ranked = self.data.withColumn('cond_rank',
                                        f.when(f.col(cond_var).isNull(), np.nan).otherwise(
                                        f.ntile(cond_ntile).over(Window.partitionBy(self.time).orderBy(cond_var))))\
                             .withColumn('cond_rank', f.col('cond_rank').cast(IntegerType()))
-            group_vars = [self.time, 'sig_rank', 'cond_rank']
+            sig_group = [self.time, 'cond_rank'] if dependent_sort is True else self.time
+            port_group = [self.time, 'sig_rank', 'cond_rank']
             merge_vars = [self.time, 'cond_rank']
-        elif cond_var is None:
-            group_vars = [self.time, 'sig_rank']
+        else:
+            cond_ranked = self.data
+            sig_group = self.time
+            port_group = [self.time, 'sig_rank']
             merge_vars = [self.time]
-        elif cond_var is not None and cond_ntile is None:
-            raise Exception('cond_var is given but cond_n is missing')
-        agged = ranked.groupBy(group_vars) \
+        # generate sig ranks
+        sig_ranked = cond_ranked \
+            .withColumn('sig_rank',
+                        f.when(f.col(self.sig).isNull(), np.nan).otherwise(
+                            f.ntile(ntile).over(Window.partitionBy(sig_group).orderBy(self.sig)))) \
+            .withColumn('sig_rank', f.col('sig_rank').cast(IntegerType()))
+        # generate portfolio returns
+        agged = sig_ranked.groupBy(port_group) \
             .agg((f.sum(f.col(self.r) * f.col(self.weight)) / f.sum(f.col(self.weight))).alias(self.r),
                  f.collect_list(self.name).alias(self.name),
                  f.count(self.r).alias('n_assets'),
                  *[f.mean(x).alias(x) for x in self.var_list])\
             .withColumn('port_r', f.lag(self.r).over(Window.partitionBy('sig_rank').orderBy(self.time)))
         # generate high minus low
-        high = agged.filter(f.col('sig_rank') == rank_high)\
+        high = agged.filter(f.col('sig_rank') == ntile)\
             .withColumnRenamed(self.r, 'r_h')\
             .withColumnRenamed('n_assets', 'n_assets_h')\
             .select(merge_vars + ['r_h', 'n_assets_h'])
-        low = agged.filter(f.col('sig_rank') == rank_low) \
+        low = agged.filter(f.col('sig_rank') == 1) \
             .withColumnRenamed(self.r, 'r_l') \
             .withColumnRenamed('n_assets', 'n_assets_l') \
             .select(merge_vars + ['r_l', 'n_assets_l'])
