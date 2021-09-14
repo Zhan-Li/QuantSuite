@@ -2,14 +2,14 @@ import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 import importlib
-import utilities as utils
+import funcs_utilities as utils
 importlib.reload(utils)
 import pyspark.sql.functions as f
 from pyspark.sql import DataFrame as PysparkDataFrame
 from pyspark.sql import Window
 from scipy.stats import ttest_1samp
 from pandas import DataFrame as PandasDataFrame
-from pyspark.sql.types import StringType
+from pyspark.sql.types import StringType, IntegerType
 from typing import List
 import re
 
@@ -45,7 +45,7 @@ class PortfolioAnalysis:
         """
         r: forward return
         """
-        self.time, self.r, self.sig, self.weight, self.name = time, forward_r, sig, weight, name
+        self.time, self.r, self.sig, self.name = time, forward_r, sig, name
         self.portr = portr
         #data = data[[time, name, sig, forward_r, weight]] if vw is True else data[[time, name, sig, r]]
         #self.data = data.loc[data[self.sig].notnull()].loc[data[self.sig] != np.nan]
@@ -54,9 +54,11 @@ class PortfolioAnalysis:
             .filter(f.col(self.sig) != np.nan)
         if self.data.limit(1).count == 0:
             raise ValueError('Data is empty')
-        if self.weight is None:
+        if weight is None or weight == 'None':
             self.weight = 'weight'
             self.data = self.data.withColumn('weight', f.lit(1))
+        else:
+            self.weight = weight
 
         if var_list is None:
             self.var_list = [sig]
@@ -68,7 +70,7 @@ class PortfolioAnalysis:
     def get_IC(self):
         return self.data.agg(f.corr(self.r, self.sig).alias('correlation'))
 
-    def gen_portr(self, ntile=None, n=None, cond_var=None, cond_n=None, total_position=0, commission=0, turnover=0) -> PandasDataFrame:
+    def gen_portr(self, ntile=None, n=None, cond_var=None, cond_ntile=None, total_position=0, commission=0, turnover=0) -> PandasDataFrame:
         """
         ntile: n quantile portfolio formation
         n: n stocks in the long and short position
@@ -81,7 +83,10 @@ class PortfolioAnalysis:
         # generate ranks
         if ntile is not None and n is None:
             ranked = self.data \
-                .withColumn('sig_rank', f.ntile(ntile).over(Window.partitionBy(self.time).orderBy(self.sig)))
+                .withColumn('sig_rank',
+                            f.when(f.col(self.sig).isNull(), np.nan).otherwise(
+                            f.ntile(ntile).over(Window.partitionBy(self.time).orderBy(self.sig))))\
+                .withColumn('sig_rank', f.col('sig_rank').cast(IntegerType()))
             rank_high = ntile
             rank_low = 1
         elif n is not None and ntile is None:
@@ -95,14 +100,17 @@ class PortfolioAnalysis:
         else:
             raise Exception('At lease one and only one of ntile and n needs to be given.')
         # generate values by ranks and conditional variable
-        if cond_var is not None and cond_n is not None:
-            ranked = ranked.withColumn('cond_rank', f.ntile(cond_n).over(Window.partitionBy(self.time).orderBy(cond_var)))
+        if cond_var is not None and cond_ntile is not None:
+            ranked = ranked.withColumn('cond_rank',
+                                       f.when(f.col(cond_var).isNull(), np.nan).otherwise(
+                                       f.ntile(cond_ntile).over(Window.partitionBy(self.time).orderBy(cond_var))))\
+                            .withColumn('cond_rank', f.col('cond_rank').cast(IntegerType()))
             group_vars = [self.time, 'sig_rank', 'cond_rank']
             merge_vars = [self.time, 'cond_rank']
         elif cond_var is None:
             group_vars = [self.time, 'sig_rank']
             merge_vars = [self.time]
-        elif cond_var is not None and cond_n is None:
+        elif cond_var is not None and cond_ntile is None:
             raise Exception('cond_var is given but cond_n is missing')
         agged = ranked.groupBy(group_vars) \
             .agg((f.sum(f.col(self.r) * f.col(self.weight)) / f.sum(f.col(self.weight))).alias(self.r),
@@ -200,12 +208,15 @@ class PortfolioAnalysis:
         def reg_OLS(pdf, factor_vars:List[str]):
             X = sm.add_constant(pdf[factor_vars])
             y = pdf['portr_excess']
-            res = sm.OLS(y, X).fit()
-            return pd.DataFrame({"coeffs": res.params,
-                                 'tvalues': res.tvalues,
-                                 "pvals": res.pvalues
+            res = sm.OLS(y, X).fit(cov_type='HAC',cov_kwds={'maxlags':3})
+            res_df= pd.DataFrame({f"coeffs": res.params,
+                                 f'tvalues': res.tvalues,
+                                 f"pvals": res.pvalues
                                  }, index=X.columns)
+            res_df.index.name = 'vars'
+            return res_df
 
+        # download factors
         if model == 'FF3' or model == 'FF5':
             factors = utils.get_FF_factors(model, mom, freq)
         elif model == 'q-factor':
