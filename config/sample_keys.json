@@ -1,0 +1,8 @@
+{
+    "quandl": "12345",
+    "alpha_vantage": "12345",
+    "binance_api_key": "12345",
+    "binance_api_secret": "12345",
+    "mysql_usr": "12345",
+    "mysql_password": "12345"
+}
