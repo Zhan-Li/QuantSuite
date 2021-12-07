@@ -1,8 +1,6 @@
 import pyspark.sql.functions as f
-from pyspark.sql import Window
 from pyspark.sql import DataFrame as SparkDataFrame
-from functools import reduce
-from operator import add
+
 
 class TimeSeriesTechnicalSignal:
     """

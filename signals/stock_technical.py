@@ -1,8 +1,6 @@
 import pyspark.sql.functions as f
 from pyspark.sql import Window
 from pyspark.sql import DataFrame as SparkDataFrame
-from functools import reduce
-from operator import add
 
 class TechnicalSignal:
     """
@@ -24,7 +22,7 @@ class TechnicalSignal:
     def window(self, start, end):
         return Window.partitionBy(self.name).orderBy(self.time).rowsBetween(start, end)
 
-    def add_past_cumr(self, r, start, end, sig_name:str):
+    def add_cumr(self, r, start, end, sig_name:str):
         """
         start, end as the star, end in rowsBetween, both start and end are inclusive.
         result: bad performance
@@ -32,7 +30,6 @@ class TechnicalSignal:
         self.data = self.data \
             .withColumn(sig_name, f.sum(f.log(f.col(r) + 1)).over(self.window(start, end))) \
             .withColumn(sig_name, f.exp(f.col(sig_name)) - 1)
-        self.data = self.filter(self.data, start, end)
         return self
 
     def add_comovement(self, r,  market_r:str, start, end, comovement:str):
@@ -51,13 +48,11 @@ class TechnicalSignal:
                         .otherwise(0)) \
             .withColumn(comovement+'_down', f.mean(f.col('same_sign')).over(self.window(start, end))) \
             .drop('same_sign')
-        self.data = self.filter(self.data, start, end)
         return self
 
     def add_correlation(self, r, market_r, start, end, corr):
         self.data = self.data\
             .withColumn(corr, f.corr(f.col(r), f.col(market_r)).over(self.window(start, end)))
-        self.data = self.filter(self.data, start, end)
         return self
 
     def add_bab(self):
@@ -71,33 +66,31 @@ class TechnicalSignal:
 
     def add_max_min_r(self, r:str,  start:str, end:str, max_r:str, min_r:str):
         self.data = self.data\
-            .withColumn(max_r, f.max(r).over(self.w(start, end)))\
-            .withColumn(min_r, f.min(r).over(self.w(start, end)))
-        self.data = self.filter(self.data, start, end)
+            .withColumn(max_r, f.max(r).over(self.window(start, end)))\
+            .withColumn(min_r, f.min(r).over(self.window(start, end)))
         return self
 
     def add_avg_r(self, r, start, end, past_avgr:str):
         self.data =  self.data\
-            .withColumn(past_avgr, f.mean(r).over(self.w(start, end))) \
+            .withColumn(past_avgr, f.mean(r).over(self.window(start, end))) \
             .withColumn('indicator', f.when(f.col(r) > 0, 1).otherwise(0)) \
-            .withColumn(past_avgr + '_up', f.mean(f.col(r) * f.col('indicator')).over(self.w(start, end))) \
+            .withColumn(past_avgr + '_up', f.mean(f.col(r) * f.col('indicator')).over(self.window(start, end))) \
             .drop('indicator') \
             .withColumn('indicator', f.when(f.col(r) < 0, 1).otherwise(0)) \
-            .withColumn(past_avgr + '_down', f.mean(f.col(r) * f.col('indicator')).over(self.w(start, end))) \
+            .withColumn(past_avgr + '_down', f.mean(f.col(r) * f.col('indicator')).over(self.window(start, end))) \
             .drop('indicator')
-        self.data = self.filter(self.data, start, end)
         return self
 
 
     def add_std(self, value, start, end, std: str):
-        self.data =  self.data.withColumn(std, f.stddev(value).over(self.window(start, end)))\
+        self.data =  self.data\
+            .withColumn(std, f.stddev(value).over(self.window(start, end)))\
             .withColumn('indicator', f.when(f.col(value) > 0, 1).otherwise(0))\
             .withColumn(std+'_up', f.stddev(f.col(value)*f.col('indicator')).over(self.window(start, end)))\
             .drop('indicator')\
             .withColumn('indicator', f.when(f.col(value) < 0, 1).otherwise(0)) \
             .withColumn(std + '_down', f.stddev(f.col(value) * f.col('indicator')).over(self.window(start, end))) \
             .drop('indicator')
-        self.data = self.filter(self.data, start, end)
         return self
 
     def add_value_average_ratio(self, value, start, end, ratio:str):
@@ -107,7 +100,6 @@ class TechnicalSignal:
         self.data = self.data\
             .withColumn('avg', f.mean(value).over(self.window(start, end)))\
             .withColumn(ratio, f.col(value)/f.col('avg'))
-        self.data = self.filter(self.data, start, end)
         return self
 
     def add_drawdown(self, r:str,  drawdown = 'drawdown'):
