@@ -18,8 +18,7 @@ from xgboost import XGBRegressor
 import importlib
 from invtools import PerformanceEvaluation, PortfolioAnalysis
 import invtools.misc_funcs as misc_funcs
-import class_return_forcaster; importlib.reload(class_return_forcaster)
-from class_return_forcaster import ReturnForecaster
+from quantsuite import ReturnForecaster
 from sklearn.svm import LinearSVR
 from sklearn.linear_model import LinearRegression, Lasso, Ridge, ElasticNet
 from sklearn.ensemble import RandomForestRegressor
@@ -56,6 +55,7 @@ import datetime
 from sqlalchemy import create_engine, insert, Table, MetaData
 import pickle
 import time
+from quantsuite.transformers import Winsorizer, Identity
 
 sns.set_theme()
 # params
@@ -101,34 +101,10 @@ rf.autoML_tpot(x_train, y_train, cv_train, True,  1, 12*60)
 rf.predict(x_test, y_test, cv_test)
 # build pipelne
 num_cols = mydata.iloc[:, 1:].columns
-class winsorize(TransformerMixin):
-
-    def __init__(self, threshold):
-        self.threshold = threshold
-
-    def fit(self, X, y=None, **fit_params):
-        return self
-
-    def transform(self, X, y=None, **fit_params):
-        X[X > self.threshold] = self.threshold
-        X[X < -self.threshold] = -self.threshold
-        return X
-
-class copy(TransformerMixin):
-
-    def fit(self, X, y=None, **fit_params):
-        return self
-
-    def transform(self, X, y=None, **fit_params):
-        return X
-
-    def inverse_transform(self, X, y=None, **fit_params):
-        return X
-
 num_transformer = Pipeline(steps=[
     ('imputer', SimpleImputer(strategy='mean')),
     ('scale', RobustScaler()),
-    ('cutoff', winsorize(1.5)),  # Cut off at 1.5 IQR)
+    ('cutoff', Winsorizer(1.5)),  # Cut off at 1.5 IQR)
 ])
 
 preprocessor_x = ColumnTransformer(
@@ -136,7 +112,7 @@ preprocessor_x = ColumnTransformer(
         ('num', num_transformer, num_cols)
     ])
 preprocessor_y = Pipeline(steps=[
-    ('copy', copy())
+    ('copy', Identity())
 ])
 # Random Forest-----------------------
 pipeline = Pipeline(steps=[

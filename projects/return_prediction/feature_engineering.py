@@ -2,20 +2,11 @@ import pandas as pd
 import pyspark.sql.functions as f
 from pyspark import StorageLevel
 import importlib
-import class_sig_option
-importlib.reload(class_sig_option)
-from class_sig_option import OptionSignal
+from quantsuite.signals import OptionSignal, TechnicalSignal
+import quantsuite.misc_funcs as utils
 from pyspark.conf import SparkConf
 from pyspark.sql import SparkSession, Window, DataFrame
-import class_sig_evaluator; importlib.reload(class_sig_evaluator)
-import funcs_utilities as utils
-import class_sig_technical; importlib.reload(class_sig_technical)
-import numpy as np
-from class_sig_technical import TechnicalSignal
-
-import class_data_manipulator
-importlib.reload(class_data_manipulator)
-from class_data_manipulator import DataManipulator
+from quantsuite import portfolio_analysis
 from pandas_profiling import ProfileReport
 import matplotlib.pyplot as plt
 import datetime
