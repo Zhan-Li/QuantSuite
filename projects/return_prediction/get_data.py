@@ -1,5 +1,5 @@
 import importlib
-import class_return_forcaster; importlib.reload(class_return_forcaster)
+from quantsuite import forcaster; importlib.reload(forcaster)
 import seaborn as sns
 import pandas as pd
 import json
@@ -27,9 +27,7 @@ crsp_connection = create_engine(f'mysql+pymysql://{usr}:{pin}@localhost/crsp')
 crsp = pd.read_sql(f"SELECT date, cusip, ret FROM stock", con=crsp_connection)
 # combine data
 crsp = crsp.sort_values('date')
-crsp['forward_ret'] = crsp.groupby('cusip')['ret'].shift(-1)
-crsp = crsp.sort_values(['cusip', 'date']).drop('ret', axis = 1)
 stock = crsp
 for i in dfs:
     stock = stock.merge(i, on = ['date', 'cusip'])
-stock.to_pickle('data.pkl')
+stock.to_pickle('data/return_prediction.pkl')
