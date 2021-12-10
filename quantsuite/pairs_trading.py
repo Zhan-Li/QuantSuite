@@ -10,6 +10,7 @@ from ray.util.joblib import register_ray
 from dask.distributed import Client
 import warnings
 
+
 class PairsTrading:
     def __init__(self, position_value, freq='daily',
                  hr_test='1', hr_trade = 'KF', hr_constant=False, hr_window=30, hr_min_share_decimal=4,
