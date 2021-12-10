@@ -1,14 +1,5 @@
 import pandas as pd
-import pyspark.sql.functions as f
-from pyspark.sql import Window
-from pyspark.sql import DataFrame as SparkDataFrame
-from functools import reduce
-from operator import add
 import numpy as np
-import yfinance as yf
-import plotly.express as px
-import plotly.io as pio
-pio.templates.default = "ggplot2"
 import seaborn as sns
 
 
