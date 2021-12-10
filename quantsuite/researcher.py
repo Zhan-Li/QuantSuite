@@ -1,5 +1,5 @@
 # class for empirical asset pricing papers.
-from class_sig_evaluator import PortfolioAnalysis
+from quantsuite.portfolio_analysis import PortfolioAnalysis
 import os
 from linearmodels import FamaMacBeth
 import pandas as pd
