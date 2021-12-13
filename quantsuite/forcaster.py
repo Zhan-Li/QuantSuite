@@ -107,6 +107,9 @@ class ReturnForecaster:
     def autoML_tpot(self, generations=100, max_time_mins=None,
                     max_eval_time_mins=30, use_gpu=True,  save_pipeline=False, file_name=None):
         """auto-ml with tpot."""
+        if save_pipeline and not file_name:
+            raise Exception('File name not given for the exporeted pipeline')
+
         if use_gpu is True:
             config_dict = 'TPOT cuML'
             n_jobs = 1
@@ -119,17 +122,14 @@ class ReturnForecaster:
                              verbosity=2,
                              cv=self.cv_train, n_jobs=n_jobs, max_time_mins=max_time_mins,
                              max_eval_time_mins=max_eval_time_mins, use_dask=True,
-                             early_stop=10, memory='auto', random_state=0, config_dict=config_dict)
+                             early_stop=10, memory='auto',  config_dict=config_dict)
         print('Start autoML with Tpot...')
         x_train = self.x_train.values if hasattr(self.x_train, 'values') else self.x_train
         y_train = self.y_train.values if hasattr(self.y_train, 'values') else self.y_train
 
         tpot.fit(x_train, y_train.reshape(-1, ))
         if save_pipeline:
-            if file_name is not None:
-                tpot.export('fitted.py')
-            else:
-                raise Exception('File name not given for the exporeted pipeline')
+            tpot.export(file_name)
         return tpot.fitted_pipeline_
 
     def interpret(self, X, y, feature_names, n_repeats):
