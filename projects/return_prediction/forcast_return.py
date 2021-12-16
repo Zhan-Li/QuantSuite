@@ -1,35 +1,21 @@
-
-
-from scipy.stats import randint, uniform
 from sklearn.ensemble import AdaBoostRegressor
-import pyspark.sql.functions as f
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.model_selection import RandomizedSearchCV
-from sklearn.metrics import mean_squared_error
-from sklearn.base import TransformerMixin
 from sklearn.preprocessing import RobustScaler
-from sklearn.pipeline import Pipeline
-from sklearn.multioutput import MultiOutputRegressor
+from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.compose import TransformedTargetRegressor
+from sklearn.linear_model import SGDRegressor
+
 from xgboost import XGBRegressor
 import importlib
-from invtools import PerformanceEvaluation, PortfolioAnalysis
-import invtools.misc_funcs as misc_funcs
-from quantsuite import ReturnForecaster
+from quantsuite.forcaster import ReturnForecaster, CustomCV, TrainTestSplitter
+from quantsuite import misc_funcs
 from sklearn.svm import LinearSVR
 from sklearn.linear_model import LinearRegression, Lasso, Ridge, ElasticNet
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.inspection import PartialDependenceDisplay
-import os
-import random
-import numpy as np
-import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
-from collections import defaultdict
 import pandas as pd
 from pyspark import SparkConf
 from pyspark.sql import SparkSession, Window, DataFrame
@@ -41,20 +27,8 @@ import tensorflow as tf
 from tensorflow.keras.layers.experimental import preprocessing
 from tensorflow.keras.layers import Dense, Dropout
 from ray import tune
-from ray.tune.suggest.hyperopt import HyperOptSearch
-from ray.tune.suggest.bayesopt import BayesOptSearch
-from ray.tune.suggest.ax import AxSearch
-from ray.tune.suggest.hebo import HEBOSearch
-from ray.tune.suggest.optuna import OptunaSearch
-import ray
-from ray.tune.schedulers import ASHAScheduler, PopulationBasedTraining
-from ray.tune.integration.keras import TuneReportCallback
 import json
-import random
-import datetime
 from sqlalchemy import create_engine, insert, Table, MetaData
-import pickle
-import time
 from quantsuite.transformers import Winsorizer, Identity
 
 sns.set_theme()
@@ -72,35 +46,36 @@ spark_conf = SparkConf() \
         .set('spark.executor.extraJavaOptions', '-Duser.timezone=UTC')
 spark = SparkSession.builder.config(conf=spark_conf).getOrCreate()
 # global params
-start = '2020-01-01'
+start = '2008-06-01'
+start_year = 2008
 freq = 'daily'
+data_file ='data/return_prediction.pkl'
+forward_r = 'forward_r_d'
 with open('secret.json') as myfile:
     secrets = json.load(myfile)
 usr = secrets['mysql_usr']
 pin= secrets['mysql_password']
 check_data = False
 tune_connection = create_engine(f'mysql+pymysql://{usr}:{pin}@localhost/tune_result')
+# read data
+stock = pd.read_pickle(data_file)
+stock = stock.loc[stock['date'] >= start]
 # preprocess data
-stock = pd.read_pickle('data.pkl')
-
+stock['rank'] = stock.groupby('date')['mktcap'].rank(ascending=False)
+stock = stock.loc[stock['rank'] <= 500].drop(['rank', 'mktcap'], axis = 1)
+stock[forward_r] = stock.sort_values('date').groupby('cusip')['ret'].shift(-1)
+stock = stock.drop(['cusip', 'ret'], axis = 1)
 na_removed = misc_funcs.select_cols_by_na(stock, 0.3)
-corr_removed = misc_funcs.select_cols_by_corr(na_removed, 'forward_ret', na_removed.iloc[:, 3:].columns, 0.5)
-mydata= corr_removed.drop('cusip', axis = 1).sort_values('date').set_index('date')
+corr_removed = misc_funcs.select_cols_by_corr(na_removed, forward_r, na_removed.iloc[:, 3:].columns, 0.5)
+mydata= corr_removed.sort_values('date').set_index('date').dropna(subset = [forward_r])
 if check_data is True:
     examine_res = pd.DataFrame()
-    examine_res = examine_res.append(misc_funcs.analyze_data(df, 'IQR', 1.5))
+    examine_res = examine_res.append(misc_funcs.analyze_data(stock, 'IQR', 1.5))
     examine_res.to_html('data_report.html')
 
-# Initilize class
-rf = ReturnForecaster(mydata.dropna(subset = ['forward_ret']))
-x_train, y_train, x_test, y_test = rf.split_train_test(0.8, 'forward_ret')
-cv_train = rf.gen_cv_index(x_train, 10, 10)
-cv_test = rf.gen_cv_index(x_test, 10, 10)
-# auto-ML
-rf.autoML_tpot(x_train, y_train, cv_train, True,  1, 12*60)
-rf.predict(x_test, y_test, cv_test)
+
 # build pipelne
-num_cols = mydata.iloc[:, 1:].columns
+num_cols = mydata.iloc[:, :-1].columns
 num_transformer = Pipeline(steps=[
     ('imputer', SimpleImputer(strategy='mean')),
     ('scale', RobustScaler()),
@@ -114,143 +89,36 @@ preprocessor_x = ColumnTransformer(
 preprocessor_y = Pipeline(steps=[
     ('copy', Identity())
 ])
-# Random Forest-----------------------
+# Initilize class
+train,  test = TrainTestSplitter(mydata).split(1/(2020-start_year))
+cv_train = CustomCV(train).gen_cv_index(10, 10)
+cv_test = CustomCV(test).gen_cv_index(10, 10)
+x_train, y_train = train.drop([forward_r], axis = 1), train[forward_r]
+x_test, y_test = test.drop([forward_r], axis = 1), test[forward_r]
+
+x_train_transformed = preprocessor_x.fit_transform(x_train)
+# auto-ML
+rf = ReturnForecaster(x_train_transformed, y_train, cv_train)
+#res = rf.autoML_tpot(100, 12*60,  save_pipeline=True, file_name='fitted.py', use_gpu=False)
+# train with model from auto_ML-----------------------
 pipeline = Pipeline(steps=[
     ('preprocessor', preprocessor_x),
-    ('model', RandomForestRegressor( random_state = 0))
+    ('model', SGDRegressor(penalty='elasticnet', learning_rate = 'invscaling'))
 ])
 estimator = TransformedTargetRegressor(regressor=pipeline, transformer=preprocessor_y)
 # train
-params= {'regressor__model__n_estimators': tune.randint(10, 500),
-            'regressor__model__min_samples_leaf':  tune.randint(50, 1000),
-         'regressor__model__max_features': tune.qrandint(1, len(num_cols), 1)}
-rf.search(params, estimator, x_train, y_train,  cv_train, n_trial=100)
-rf.predict(x_test, y_test, cv_test)
-rf.simulate(spark,'daily', 'date')
-rf.insert_to_db(['crsp', 'optionmetrics'], '2020-01-01', '2020-12-31', 'daily', 'randomforestRegressor',
-                   'option_sig', tune_connection)
-
-
-# Adaboost
-model_name = 'AdaBoostRegressor'
-pipeline = Pipeline(steps=[
-    ('preprocessor', preprocessor_x),
-    ('model', AdaBoostRegressor( random_state = 0))])
-estimator = TransformedTargetRegressor(regressor=pipeline, transformer=preprocessor_y)
-# Initilize class
-rf = ReturnForecaster(mydata.dropna(subset = ['forward_ret']))
-x_train, y_train, x_test, y_test = rf.split_train_test(0.8, 'forward_ret')
-cv_train = rf.gen_cv_index(x_train, 10, 10)
-cv_test = rf.gen_cv_index(x_test, 10, 10)
-# model interpretability
-models =  [DecisionTreeRegressor(max_depth=n) for n in [1, 2, 3, 4, 5]]
-params= {'regressor__model__base_estimator': models,
-    'regressor__model__n_estimators': tune.randint(10, 500),
-            'regressor__model__learning_rate':  tune.quniform(0.01, 1, 0.01),
-         'regressor__model__loss': ['linear', 'square', 'exponential']}
-rf.search(params, estimator, x_train, y_train,  cv_train, n_trial=100)
-rf.predict(x_test, y_test, cv_test)
-rf.simulate(spark,'daily', 'date')
-rf.best_params['regressor__model__base_estimator_max_depth'] = 1
-rf.best_params.pop('regressor__model__base_estimator')
-rf.insert_to_db(['crsp', 'optionmetrics'], '2020-01-01', '2020-12-31', 'daily', model_name,
-                   'option_sig', tune_connection)
-
-# XGboost
-model_name = 'XGBRegressor'
-pipeline = Pipeline(steps=[
-    ('preprocessor', preprocessor_x),
-    ('model', XGBRegressor(objective = 'reg:squarederror', n_jobs =1, tree_method = 'hist',  random_state = 0))
-])
-estimator = TransformedTargetRegressor(regressor=pipeline, transformer=preprocessor_y)
-# Initilize class
-rf = ReturnForecaster(mydata.dropna(subset = ['forward_ret']))
-x_train, y_train, x_test, y_test = rf.split_train_test(0.8, 'forward_ret')
-cv_train = rf.gen_cv_index(x_train, 10, 10)
-cv_test = rf.gen_cv_index(x_test, 10, 10)
-# train
-params= {'regressor__model__n_estimators': tune.randint(10, 500),
-        'regressor__model__max_depth':  tune.randint(1, 5),
-            'regressor__model__learning_rate':  tune.quniform(0.01, 1, 0.01),
-         'regressor__model__booster': ['gbtree'],
-        'regressor__model__tree_method': ['approx'],
-        'regressor__model__subsample': tune.quniform(0.1, 1, 0.1),
-        'regressor__model__colsample_bytree': tune.quniform(0.1, 1, 0.1),
-        'regressor__model__reg_alpha': tune.quniform(0.01, 1, 0.01),
-         'regressor__model__reg_lambda': tune.quniform(0.01, 1, 0.01)}
-rf.search(params, estimator, x_train, y_train,  cv_train, n_trial=1000)
-rf.predict(x_test, y_test, cv_test)
-rf.backtest(spark,'daily', 'date')
-rf.insert_to_db(['crsp', 'optionmetrics'], '2020-01-01', '2020-12-31', 'daily', model_name,
-                   'option_sig', tune_connection)
-
-# KNN----------------------------
-model_name = 'KNN'
-pipeline = Pipeline(steps=[
-    ('preprocessor', preprocessor_x),
-    ('model',  KNeighborsRegressor())
-])
-estimator = TransformedTargetRegressor(regressor=pipeline, transformer=preprocessor_y)
-# Initilize class
-rf = ReturnForecaster(mydata.dropna(subset = ['forward_ret']))
-x_train, y_train, x_test, y_test = rf.split_train_test(0.8, 'forward_ret')
-cv_train = rf.gen_cv_index(x_train, 10, 10)
-cv_test = rf.gen_cv_index(x_test, 10, 10)
-# train
-params= {'regressor__model__n_neighbors': tune.randint(1, 500),
-        'regressor__model__weights': ['distance', 'uniform']}
-rf.search(params, estimator, x_train, y_train,  cv_train, n_trial=100)
-rf.predict(x_test, y_test, cv_test)
-rf.backtest(spark,'daily', 'date')
-rf.insert_to_db(['crsp', 'optionmetrics'], '2020-01-01', '2020-12-31', 'daily', model_name,
-                   'option_sig', tune_connection)
-
-
-# Elastic net ---------
-model_name = 'ElasticNet'
-pipeline = Pipeline(steps=[
-    ('preprocessor', preprocessor_x),
-    ('model',  ElasticNet())
-])
-estimator = TransformedTargetRegressor(regressor=pipeline, transformer=preprocessor_y)
-# Initilize class
-rf = ReturnForecaster(mydata.dropna(subset = ['forward_ret']))
-x_train, y_train, x_test, y_test = rf.split_train_test(0.8, 'forward_ret')
-cv_train = rf.gen_cv_index(x_train, 10, 10)
-cv_test = rf.gen_cv_index(x_test, 10, 10)
-# train
-params= {'regressor__model__alpha': tune.uniform(0.001, 20),
-        'regressor__model__l1_ratio': tune.uniform(0.001, 1)}
-rf.search(params, estimator, x_train, y_train,  cv_train, n_trial=500)
-rf.predict(x_test, y_test, cv_test)
-rf.backtest(spark,'daily', 'date')
-rf.insert_to_db(['crsp', 'optionmetrics'], '2020-01-01', '2020-12-31', 'daily', model_name,
-                   'option_sig', tune_connection)
-
-# Linear-SVR----------
-model_name = 'LinearSVR'
-pipeline = Pipeline(steps=[
-    ('preprocessor', preprocessor_x),
-    ('model',  LinearSVR(random_state=0))
-])
-estimator = TransformedTargetRegressor(regressor=pipeline, transformer=preprocessor_y)
-# Initilize class
-rf = ReturnForecaster(mydata.dropna(subset = ['forward_ret']))
-x_train, y_train, x_test, y_test = rf.split_train_test(0.8, 'forward_ret')
-cv_train = rf.gen_cv_index(x_train, 10, 10)
-cv_test = rf.gen_cv_index(x_test, 10, 10)
-# train
-params= {'regressor__model__epsilon': tune.uniform(0, 0.1),
-        'regressor__model__C': tune.uniform(0.001, 10),
-         'regressor__model__loss':['epsilon_insensitive', 'squared_epsilon_insensitive']}
-rf.search(params, estimator, x_train, y_train,  cv_train, n_trial=200)
-rf.predict(x_test, y_test, cv_test)
-rf.backtest(spark,'daily', 'date')
-rf.insert_to_db(['crsp', 'optionmetrics'], '2020-01-01', '2020-12-31', 'daily', model_name,
-                   'option_sig', tune_connection)
-
-
-
+params ={'regressor__model__alpha': tune.uniform(0, 1),
+        'regressor__model__l1_ratio': tune.uniform(0, 1),
+        'regressor__model__max_iter': tune.qrandint(1000, 10000, 1000),
+        'regressor__model__tol': tune.uniform(0, 0.1),
+         'regressor__model__eta0': tune.uniform(0, 1),
+         'regressor__model__power_t': tune.quniform(0.1, 150.0, 0.1),
+         'regressor__model__early_stopping': tune.choice([True, False])
+    }
+rf = ReturnForecaster(x_train, y_train, cv_train)
+rf.search(params, estimator, 100)
+rf.backtest(spark, x_train, y_train, cv_train, 'date', 'daily')
+rf.perf
 # ANN------------------------------------
 
 random_grid ={
@@ -262,6 +130,27 @@ random_grid ={
     }
 
 
+
+
+
+
+from keras.wrappers.scikit_learn import KerasRegressor
+from keras.models import Sequential
+from keras.layers import Dense
+from sklearn.model_selection import cross_val_score
+def create_baseline():
+    # create model
+    model = Sequential()
+    model.add(Dense(30, activation='relu'))
+    model.add(Dense(30, activation='relu'))
+    model.add(Dense(1))
+    # Compile model
+    model.compile(loss='mean_squared_error', optimizer='adam')
+    return model
+# evaluate model with standardized dataset
+estimator = KerasRegressor(build_fn=create_baseline, epochs=10000, batch_size=1000,  verbose=0)
+results = cross_val_score(estimator, x_train_transformed, y_train, cv=cv_train, verbose=10)
+print("Baseline: %.2f%% (%.2f%%)" % (results.mean()*100, results.std()*100))
 
 
 
