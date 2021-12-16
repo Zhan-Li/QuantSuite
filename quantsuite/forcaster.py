@@ -83,6 +83,7 @@ class ReturnForecaster:
 
     def search(self, params, pipeline, n_trial, n_jobs=-1, use_gpu=False, verbose=2):
         """
+        Singple model hyperparameter tuner
         search hyperparameter with the training and validation data and predict with the test dataset.
         """
         search = TuneSearchCV(
