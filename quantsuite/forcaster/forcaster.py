@@ -14,7 +14,6 @@ from tpot import TPOTRegressor
 
 from quantsuite.performance_evaluation import PerformanceEvaluation
 from quantsuite.portfolio_analysis import PortfolioAnalysis
-from quantsuite.forcaster.scorer import get_sharpe_ratio
 
 class TrainTestSplitter:
     """Split time series into train test datasets"""
@@ -81,7 +80,7 @@ class ReturnForecaster:
         self.test_score = None
         self.perf = None
 
-    def search(self, params, pipeline, n_trial, n_jobs=-1, use_gpu=False, verbose=2):
+    def search(self, params, pipeline, scoring,  n_trial, n_jobs=-1, use_gpu=False, verbose=2):
         """
         Singple model hyperparameter tuner
         search hyperparameter with the training and validation data and predict with the test dataset.
@@ -92,7 +91,7 @@ class ReturnForecaster:
             search_optimization="hyperopt",
             n_trials=n_trial,
             early_stopping=False,
-            scoring=get_sharpe_ratio,
+            scoring=scoring,
             cv=self.cv_train,
             max_iters=1,
             verbose=verbose,
@@ -105,24 +104,16 @@ class ReturnForecaster:
         self.best_params = search.best_params_
         self.best_pipeline = search.best_estimator_
 
-    def autoML_tpot(self, generations=100, max_time_mins=None,
-                    max_eval_time_mins=30, use_gpu=True,  save_pipeline=False, file_name=None):
+    def autoML_tpot(self, config_dict, n_jobs, generations=100, scoring ='neg_mean_squared_error',  max_time_mins=None,
+                    max_eval_time_mins=30, save_pipeline=False, file_name=None):
         """auto-ml with tpot."""
         if save_pipeline and not file_name:
             raise Exception('File name not given for the exporeted pipeline')
 
-        if use_gpu is True:
-            config_dict = 'TPOT cuML'
-            n_jobs = 1
-        else:
-            config_dict = None
-            n_jobs = -1
-            print("Warning, you're not using GPU.")
-
-        tpot = TPOTRegressor(generations=generations, population_size=100, scoring= get_sharpe_ratio,
+        tpot = TPOTRegressor(generations=generations, population_size=100, scoring= scoring,
                              verbosity=2,
                              cv=self.cv_train, n_jobs=n_jobs, max_time_mins=max_time_mins,
-                             max_eval_time_mins=max_eval_time_mins, use_dask=True,
+                             max_eval_time_mins=max_eval_time_mins, use_dask=False,
                              early_stop=10, memory='auto',  config_dict=config_dict)
         print('Start autoML with Tpot...')
         x_train = self.x_train.values if hasattr(self.x_train, 'values') else self.x_train
