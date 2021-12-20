@@ -9,6 +9,7 @@ def read_holdings(url_key, url_value):
     df=pd.DataFrame(df2[0]).dropna(how='all',axis=1 )
     df.columns = ['counter', 'company', 'ticker', 'cusip','shares', 'mktcap', weight_col]
     return df[['ticker', weight_col]]
+
 def download_ARK():
     ARKK = 'https://ark-funds.com/wp-content/fundsiteliterature/holdings/ARK_INNOVATION_ETF_ARKK_HOLDINGS.pdf'
     ARKQ = 'https://ark-funds.com/wp-content/fundsiteliterature/holdings/ARK_AUTONOMOUS_TECHNOLOGY_&_ROBOTICS_ETF_ARKQ_HOLDINGS.pdf'
