@@ -1,6 +1,7 @@
 import numpy as np
 
 regressor_config = {
+
     'sklearn.ensemble.ExtraTreesRegressor': {
         'n_estimators': [100],
         'max_features': np.arange(0.05, 1.01, 0.05),
@@ -37,14 +38,6 @@ regressor_config = {
         'n_neighbors': range(1, 101),
         'weights': ["uniform", "distance"],
         'p': [1, 2]
-    },
-
-    'sklearn.svm.LinearSVR': {
-        'loss': ["epsilon_insensitive", "squared_epsilon_insensitive"],
-        'dual': [True, False],
-        'tol': [1e-5, 1e-4, 1e-3, 1e-2, 1e-1],
-        'C': [1e-4, 1e-3, 1e-2, 1e-1, 0.5, 1., 5., 10., 15., 20., 25.],
-        'epsilon': [1e-4, 1e-3, 1e-2, 1e-1, 1.]
     },
 
     'sklearn.ensemble.RandomForestRegressor': {
@@ -122,6 +115,7 @@ regressor_config = {
         'threshold': [10]
     },
 
+
     # Selectors
     'sklearn.feature_selection.SelectFwe': {
         'alpha': np.arange(0, 0.05, 0.001),
@@ -164,12 +158,6 @@ regressor_config_cuml = {
         "max_depth": range(10, 100, 5),
         "max_features": np.arange(0.1, 1, 0.1),
         "n_bins": range(100, 1000, 100),
-    },
-
-    "cuml.svm.LinearSVR":{
-        "loss": ["epsilon_insensitive", "squared_epsilon_insensitive"],
-        "C": np.arange(0.1, 1, 0.1),
-
     },
 
     "xgboost.XGBRegressor": {
