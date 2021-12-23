@@ -63,7 +63,7 @@ class CustomCV:
         return cv
 
 
-class ReturnForecaster:
+class Forecaster:
     """
     Wrapper around sklearn and tpot, tailored for time-series return prediction.
     """
@@ -154,7 +154,7 @@ class ReturnForecaster:
         ----------
         spark: pyspark object
         X : features
-        y : target
+        y : target, pd.series with time index
         cv : index for train, predict.
         model : model has higher priority than self.best_pipeline. That is, If model and fitted_best_pipeline are both
             supplied, fitted_best pipeline will be used instead. If model is None, then fitted best_pipeline
@@ -165,7 +165,7 @@ class ReturnForecaster:
         -------
 
         """
-        print('Predicting on the test set...')
+        print('Backtesting...')
 
         if model:
             estimator = model
@@ -174,8 +174,10 @@ class ReturnForecaster:
         else:
             raise Exception('Either model needs to be supplied or best_pipeline needs to provided by search')
 
-        self.y_test_true = pd.concat([y.iloc[predict_index] for train_index, predict_index in cv])
-        y_test_pred = [estimator.fit(X.iloc[train_index], y.iloc[train_index]).predict(X.iloc[predict_index])
+        X = X if type(X) is np.ndarray else X.values
+
+        self.y_test_true = pd.concat([y.iloc[predict_index] for train_index, predict_index in cv ])
+        y_test_pred = [estimator.fit(X[train_index], y.iloc[train_index]).predict(X[predict_index])
                        for train_index, predict_index in cv]
         self.y_test_pred = pd.Series(np.concatenate(y_test_pred), index=self.y_test_true.index)
         self.test_score = -mean_squared_error(self.y_test_true, self.y_test_pred)
@@ -188,6 +190,7 @@ class ReturnForecaster:
         r = r.loc[r['sig_rank'] == 'high_minus_low']['y_true']
         perf = PerformanceEvaluation(r)
         self.perf = perf.get_stats(freq)
+        self.port_r = r
 
     def insert_to_db(self, dataset_names: List[str], sample_start: str, sample_end: str, sample_freq: str,
                      model_name: str, table: str, db_con):
