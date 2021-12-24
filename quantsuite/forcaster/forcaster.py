@@ -80,8 +80,9 @@ class Forecaster:
         self.test_score = None
         self.perf = None
 
-    def search(self, params, pipeline, scoring,  n_trial, n_jobs=-1, use_gpu=False, verbose=2):
+    def search(self, params, pipeline, scoring,  n_trial, max_search_seconds, n_jobs=-1, use_gpu=False, verbose=2):
         """
+        ray tune search using scikit API
         Singple model hyperparameter tuner
         search hyperparameter with the training and validation data and predict with the test dataset.
         """
@@ -96,6 +97,7 @@ class Forecaster:
             max_iters=1,
             verbose=verbose,
             n_jobs=n_jobs,
+            time_budget_s = max_search_seconds,
             use_gpu=use_gpu,
         )
         print('Searching the the best hyperparameters...')
@@ -174,12 +176,18 @@ class Forecaster:
         else:
             raise Exception('Either model needs to be supplied or best_pipeline needs to provided by search')
 
-        X = X if type(X) is np.ndarray else X.values
-
         self.y_test_true = pd.concat([y.iloc[predict_index] for train_index, predict_index in cv ])
-        y_test_pred = [estimator.fit(X[train_index], y.iloc[train_index]).predict(X[predict_index])
-                       for train_index, predict_index in cv]
+
+        if type(X) == np.ndarray:
+            y_test_pred = [estimator.fit(X[train_index], y.iloc[train_index]).predict(X[predict_index])
+                           for train_index, predict_index in cv]
+        elif type(X) == pd.DataFrame:
+            y_test_pred = [estimator.fit(X.iloc[train_index], y.iloc[train_index]).predict(X.iloc[predict_index])
+                           for train_index, predict_index in cv]
+        else:
+            raise TypeError('X is either numpy.ndarray or pd.DataFrame')
         self.y_test_pred = pd.Series(np.concatenate(y_test_pred), index=self.y_test_true.index)
+
         self.test_score = -mean_squared_error(self.y_test_true, self.y_test_pred)
 
         returns = pd.DataFrame({'y_true': self.y_test_true, 'y_pred': self.y_test_pred}).reset_index()
