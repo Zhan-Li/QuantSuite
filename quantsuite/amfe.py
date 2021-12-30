@@ -3,9 +3,8 @@ import pandas as pd
 import pyspark.sql.functions as f
 from pyspark.sql import Window
 from pyspark.sql import DataFrame as SparkDataFrame
-from invtools.PerformanceEvaluation import PerformanceEvaluation
-from typing import Tuple, List
-from pandas import DataFrame as PandasDataFrame
+from quantsuite.performance_evaluation import PerformanceEvaluation
+from typing import List
 import quantstats
 from jinja2 import Environment, FileSystemLoader
 from typing import Dict
