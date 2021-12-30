@@ -11,26 +11,47 @@ from sklearn.inspection import PartialDependenceDisplay, permutation_importance
 from sklearn.metrics import mean_squared_error
 from sqlalchemy import MetaData, Table
 from tpot import TPOTRegressor
-
 from quantsuite.performance_evaluation import PerformanceEvaluation
 from quantsuite.portfolio_analysis import PortfolioAnalysis
+
 
 class TrainTestSplitter:
     """Split time series into train test datasets"""
 
     def __init__(self, data: DataFrame):
-        self.data = data
+        """
+              split train validation data
+              train_size: fraction to used as train
+        """
         if not isinstance(data.index, pd.DatetimeIndex):
             raise Exception('Data index needs to be pd.DatetimeIndex')
+        self.data = data
 
-    def split(self, train_size: float):
+    def split(self, test_offset_periods, train_end_time=None, train_fraction=None):
         """
-        split train validation data
-        train_size: fraction to used as train
+
+        Parameters
+        ----------
+        test_offset_periods : int. if test_offset_periods is negative, then train_end_time-test_offset_periods to train_
+        end_time will serve as the training data for testing. For example, test_offset_periods = -10, then last 10
+        periods will be used as training data.
+        train_end_time : str or None, end cutoff time for training data
+        train_fraction : float or None, fraction of data as training data
+
+        Returns: tuple of pandas DataFrames
+        -------
+
         """
-        index = self.data.index.unique().sort_values()
-        cut_date = index[int(train_size * len(index))]
-        return self.data.loc[self.data.index < cut_date], self.data.loc[self.data.index >= cut_date]
+        if train_fraction and train_end_time:
+            raise ValueError('Either train_end_time or train_fraction but not both.')
+        if not train_fraction and not train_end_time:
+            raise ValueError('Either train_end_time or train_fraction needs to be provided.')
+        if not train_end_time:
+            index = self.data.index.unique().sort_values()
+            train_end_time = index[int(train_fraction * len(index))]
+        test_start_date = self.data.index[self.data.index <= train_end_time].unique().sort_values()[test_offset_periods]
+        return self.data.loc[self.data.index <= train_end_time], self.data.loc[
+            self.data.index >= test_start_date]
 
 
 class CustomCV:
@@ -41,26 +62,33 @@ class CustomCV:
         if not isinstance(data.index, pd.DatetimeIndex):
             raise Exception('Data index needs to be pd.DatetimeIndex')
 
-    def gen_cv_index(self, window_size: int, window_step=1, moving_window: bool = True):
+    def gen_cv_index(self, train_window_size: int, val_window_size: int, window_step: int, moving_window: bool = True):
         """
         customized cross-validation index
         train: training dataset
-        window: window size
+        window_step: step between difference train windows. For example, if first train window starts at index 0
+            then the second train window will start at index 10 if window_step = 10.
         """
         time = self.data.index.name
         train = self.data.reset_index()
         groups = train.groupby(time).groups
         sorted_index = [index.values for (key, index) in sorted(groups.items())]
-        counter = range(window_size, len(groups) - window_size - window_step, window_step)
-        if moving_window is True:
-            cv = [(np.concatenate(sorted_index[i:i + window_size]),
-                   np.concatenate(sorted_index[i + window_size:i + window_size + window_step]))
-                  for i in counter]
-        else:
-            cv = [(np.concatenate(sorted_index[0:i + window_size]),
-                   np.concatenate(sorted_index[i + window_size:i + window_size + window_step]))
-                  for i in counter]
+        cv = []
+        i = 0
+        while i + train_window_size <= len(sorted_index) - 1:
+            train_index = sorted_index[i if moving_window else 0: i + train_window_size]
+            val_index = sorted_index[i + train_window_size: i + train_window_size + val_window_size]
+            cv.append((np.concatenate(train_index), np.concatenate(val_index)))
+            i = i + window_step
         return cv
+
+    def gen_train_pred_index(self,train_window_size: int, pred_window_size: int, window_step,
+                             moving_window: bool = True, print_index: bool = True):
+        train_pred_index = self.gen_cv_index(train_window_size, pred_window_size, window_step, moving_window)
+        if print_index:
+            print(f'The first train index is: \n { self.data.iloc[train_pred_index[0][0]].index}')
+            print(f'The first pred index is: \n { self.data.iloc[train_pred_index[0][1]].index}')
+        return train_pred_index
 
 
 class Forecaster:
@@ -80,7 +108,9 @@ class Forecaster:
         self.test_score = None
         self.perf = None
 
-    def search(self, params, pipeline, scoring,  n_trial, max_search_seconds, n_jobs=-1, use_gpu=False, verbose=2):
+    def search(self, params, pipeline, scoring, n_trial, max_search_seconds, n_jobs=-1, use_gpu=False,
+               save_result = True, file_name = 'ray_best_pipeline.pkl',
+               verbose=2):
         """
         ray tune search using scikit API
         Singple model hyperparameter tuner
@@ -97,7 +127,7 @@ class Forecaster:
             max_iters=1,
             verbose=verbose,
             n_jobs=n_jobs,
-            time_budget_s = max_search_seconds,
+            time_budget_s=max_search_seconds,
             use_gpu=use_gpu,
         )
         print('Searching the the best hyperparameters...')
@@ -105,18 +135,21 @@ class Forecaster:
         self.best_score = search.best_score_
         self.best_params = search.best_params_
         self.best_pipeline = search.best_estimator_
+        if save_result:
+            with open(file_name, 'wb') as file:
+                pickle.dump(search.best_estimator_, file)
 
-    def autoML_tpot(self, config_dict, n_jobs, generations=100, scoring ='neg_mean_squared_error',  max_time_mins=None,
+    def autoML_tpot(self, config_dict, n_jobs, generations=100, scoring='neg_mean_squared_error', max_time_mins=None,
                     max_eval_time_mins=30, save_pipeline=False, file_name=None):
         """auto-ml with tpot."""
         if save_pipeline and not file_name:
             raise Exception('File name not given for the exporeted pipeline')
 
-        tpot = TPOTRegressor(generations=generations, population_size=100, scoring= scoring,
+        tpot = TPOTRegressor(generations=generations, population_size=100, scoring=scoring,
                              verbosity=2,
                              cv=self.cv_train, n_jobs=n_jobs, max_time_mins=max_time_mins,
                              max_eval_time_mins=max_eval_time_mins, use_dask=False,
-                             early_stop=10, memory='auto',  config_dict=config_dict)
+                             early_stop=10, memory='auto', config_dict=config_dict)
         print('Start autoML with Tpot...')
         x_train = self.x_train.values if hasattr(self.x_train, 'values') else self.x_train
         y_train = self.y_train.values if hasattr(self.y_train, 'values') else self.y_train
@@ -148,7 +181,7 @@ class Forecaster:
 
         return plot_partial_dependence(), plot_permutation_importance()
 
-    def backtest(self, spark, X, y, cv, time: str, freq: str, model=None):
+    def predict(self, spark, X, y, train_predict_index, time: str, freq: str, model=None):
         """
         backtest equal weighted long-short portfolio performance on the test dataset.
 
@@ -157,7 +190,7 @@ class Forecaster:
         spark: pyspark object
         X : features
         y : target, pd.series with time index
-        cv : index for train, predict.
+        train_predict_index : index for train, predict.
         model : model has higher priority than self.best_pipeline. That is, If model and fitted_best_pipeline are both
             supplied, fitted_best pipeline will be used instead. If model is None, then fitted best_pipeline
             will be used. Note that best_pipeline from automl_tpot cannot be used because tpot pipeline does not include
@@ -176,14 +209,14 @@ class Forecaster:
         else:
             raise Exception('Either model needs to be supplied or best_pipeline needs to provided by search')
 
-        self.y_test_true = pd.concat([y.iloc[predict_index] for train_index, predict_index in cv ])
+        self.y_test_true = pd.concat([y.iloc[predict_index] for train_index, predict_index in train_predict_index])
 
         if type(X) == np.ndarray:
             y_test_pred = [estimator.fit(X[train_index], y.iloc[train_index]).predict(X[predict_index])
-                           for train_index, predict_index in cv]
+                           for train_index, predict_index in train_predict_index]
         elif type(X) == pd.DataFrame:
             y_test_pred = [estimator.fit(X.iloc[train_index], y.iloc[train_index]).predict(X.iloc[predict_index])
-                           for train_index, predict_index in cv]
+                           for train_index, predict_index in train_predict_index]
         else:
             raise TypeError('X is either numpy.ndarray or pd.DataFrame')
         self.y_test_pred = pd.Series(np.concatenate(y_test_pred), index=self.y_test_true.index)
