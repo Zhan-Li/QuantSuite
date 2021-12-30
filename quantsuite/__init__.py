@@ -4,4 +4,4 @@ from quantsuite.pairs_trading import PairsTrading
 from quantsuite.performance_evaluation import PerformanceEvaluation
 from quantsuite.portfolio_analysis import PortfolioAnalysis, get_port_r
 from quantsuite.researcher import EAPResearcher
-from quantsuite.transformers import Winsorizer, Identity
+from quantsuite.forcaster.transformers import Winsorizer, Identity
