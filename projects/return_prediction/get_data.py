@@ -1,3 +1,4 @@
+# This script download data from mysql database
 import pandas as pd
 import json
 from sqlalchemy import create_engine, insert, Table, MetaData
@@ -6,7 +7,7 @@ with open('secret.json') as myfile:
     secrets = json.load(myfile)
 usr = secrets['mysql_usr']
 pin= secrets['mysql_password']
-start = '2008-01-01'
+start = '1996-01-01'
 # import option signals from mysql
 optionsig_connection = create_engine(f'mysql+pymysql://{usr}:{pin}@localhost/option_sig')
 dfs = []
