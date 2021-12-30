@@ -1,8 +1,7 @@
 
 from polygon import RESTClient
-import quandl
+import nasdaqdatalink
 import json
-# evaluate signal using stocks as investment
 import pandas as pd
 from datetime import date, timedelta
 import pandas_market_calendars as  mcal
@@ -29,8 +28,8 @@ class Algo:
 
     def download_all_tickers_info(self):
         # download all tickers for US firms
-        quandl.ApiConfig.api_key = self.keys['quandl_key']
-        tickers = quandl.get_table('SHARADAR/TICKERS', table='SEP', paginate=True)
+        nasdaqdatalink.ApiConfig.api_key = self.keys['quandl_key']
+        tickers = nasdaqdatalink.get_table('SHARADAR/TICKERS', table='SEP', paginate=True)
         tickers = tickers.loc[tickers['isdelisted'] == 'N']
         return tickers
 
