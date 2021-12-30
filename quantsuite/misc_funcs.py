@@ -2,7 +2,6 @@ import pandas as pd
 from pyspark.sql import DataFrame as SparkDataframe
 import numpy as np
 from pyspark.sql import SparkSession, Window, DataFrame
-from pyspark.conf import SparkConf
 import pyspark.sql.functions as f
 import joblib
 import yfinance as yf
@@ -41,7 +40,7 @@ def get_mom_factors(freq='daily'):
                 'http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Momentum_Factor_CSV.zip',
             'yearly':
                 'http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Momentum_Factor_CSV.zip'}
-    mom_factor = pd.read_csv(urls[freq],  skiprows=13).astype(str).rename(columns = {'Unnamed: 0': 'date' })
+    mom_factor = pd.read_csv(urls[freq], skiprows=13).astype(str).rename(columns={'Unnamed: 0': 'date'})
     mom_factor.columns = mom_factor.columns.str.strip()
     mom_factor = mom_factor.loc[(mom_factor['Mom'] != '-99.99') & (mom_factor['Mom'] != '-999')]
     time_length = mom_factor['date'].str.strip().str.len()
@@ -59,14 +58,14 @@ def get_FF_breakpoints(what='ME'):
     return a dataframe containing returns for HML, market, SMB
     """
     urls = {'ME': 'https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/ME_Breakpoints_CSV.zip'}
-    break_points = pd.read_csv(urls[what],  skiprows=1, skipfooter=1)
+    break_points = pd.read_csv(urls[what], skiprows=1, skipfooter=1)
     break_points.columns = ['yearmon', 'n'] + [str(i) + '%' for i in range(5, 105, 5)]
     for col in [i for i in break_points.columns if i not in ['yearmon', 'n']]:
-        break_points[col] = break_points[col]*1000000
+        break_points[col] = break_points[col] * 1000000
     return break_points
 
 
-def get_FF_factors(model = 'FF5', mom = True, freq='daily'):
+def get_FF_factors(model='FF5', mom=True, freq='daily'):
     """
     return a dataframe containing returns for HML, market, SMB
     """
@@ -78,23 +77,23 @@ def get_FF_factors(model = 'FF5', mom = True, freq='daily'):
         raise ValueError('Valid values for freq are daily, weekly, monthly, yearly')
 
     urls = {
-        'FF3':{'daily':
-                'https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_daily_CSV.zip',
-            'weekly':
-                'https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_weekly_CSV.zip',
-            'monthly':
-                'https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip',
-            'yearly':
-                'https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip'},
+        'FF3': {'daily':
+                    'https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_daily_CSV.zip',
+                'weekly':
+                    'https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_weekly_CSV.zip',
+                'monthly':
+                    'https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip',
+                'yearly':
+                    'https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip'},
         'FF5': {'daily':
-                'http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_daily_CSV.zip',
-            'monthly':
-                'http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_CSV.zip',
-            'yearly':
-                'http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_CSV.zip'}
+                    'http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_daily_CSV.zip',
+                'monthly':
+                    'http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_CSV.zip',
+                'yearly':
+                    'http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_CSV.zip'}
     }
 
-    FF_factors = pd.read_csv(urls[model][freq],  skiprows=3).astype(str).rename(columns = {'Unnamed: 0': 'date' })
+    FF_factors = pd.read_csv(urls[model][freq], skiprows=3).astype(str).rename(columns={'Unnamed: 0': 'date'})
     FF_factors = FF_factors.apply(lambda x: x.str.strip())
     FF_factors.columns = FF_factors.columns.str.strip()
     if freq == 'monthly':
@@ -112,7 +111,7 @@ def get_FF_factors(model = 'FF5', mom = True, freq='daily'):
     return FF_factors
 
 
-def get_q_factors(mom = True, freq='daily'):
+def get_q_factors(mom=True, freq='daily'):
     """
     return a dataframe containing returns for HML, market, SMB
     weekly1: weekly calendar
@@ -127,23 +126,23 @@ def get_q_factors(mom = True, freq='daily'):
             'quarterly': 'http://global-q.org/uploads/1/2/2/6/122679606/q5_factors_quarterly_2020.csv',
             'yearly': 'http://global-q.org/uploads/1/2/2/6/122679606/q5_factors_annual_2020.csv'
 
-    }
+            }
 
     q_factors = pd.read_csv(urls[freq])
     if freq == 'daily':
         q_factors['date'] = q_factors['DATE']
         q_factors = q_factors.drop(['DATE'], axis=1)
-    elif freq =='monthly':
+    elif freq == 'monthly':
         q_factors['date'] = q_factors['year'].astype(str) + q_factors['month'].astype(str).str.zfill(2)
-        q_factors = q_factors.drop(['year', 'month'], axis = 1)
+        q_factors = q_factors.drop(['year', 'month'], axis=1)
     elif freq == 'quarterly':
         q_factors['date'] = q_factors['year'].astype(str) + q_factors['quarter'].astype(str).str.zfill(2)
-        q_factors = q_factors.drop(['year', 'quarter'], axis = 1)
+        q_factors = q_factors.drop(['year', 'quarter'], axis=1)
     elif freq == 'yearly':
         q_factors['date'] = q_factors['year']
         q_factors = q_factors.drop(['year'], axis=1)
     q_factors['date'] = q_factors['date'].astype(str)
-    q_factors = q_factors.rename(columns={'R_F':'RF', 'R_MKT': 'R_MKT-RF'})
+    q_factors = q_factors.rename(columns={'R_F': 'RF', 'R_MKT': 'R_MKT-RF'})
 
     if mom is True:
         mom_factor = get_mom_factors(freq)
@@ -153,7 +152,6 @@ def get_q_factors(mom = True, freq='daily'):
     q_factors = q_factors.astype(float).apply(lambda x: x / 100)
     q_factors = q_factors.dropna()
     return q_factors
-
 
 
 def print_optuna_optimization(file):
@@ -168,8 +166,7 @@ def print_optuna_optimization(file):
         print(f'    {key}: {value}')
 
 
-def downsample_from_daily(data, time, name, r: str, vars: List[str], to_freq: str, var_agg_rule: str,
-                          resampled_r='resampled_r', resampled_forward_r='resampled_forwardr'):
+def downsample_from_daily(data, time: str, name: str, r: str, vars: List[str], to_freq: str, var_agg_rule = 'mean'):
     # pandas resample strings
     strs = {'weekly': 'W-FRI', 'monthly': 'M', 'quarterly': 'Q', 'yearly': 'A'}
     if r in vars:
@@ -180,13 +177,11 @@ def downsample_from_daily(data, time, name, r: str, vars: List[str], to_freq: st
         df_r = data[[time, name, r]] \
             .assign(log_gross_r=np.log(1 + data[r])) \
             .groupby(name).resample(strs[to_freq], on=time).sum()
-        df_r[resampled_r] = np.exp(df_r['log_gross_r']) - 1
-        if resampled_forward_r is not None:
-            df_r[resampled_forward_r] = df_r.groupby(name)[resampled_r].shift(-1)
-        df_r = df_r.drop(['log_gross_r'], axis = 1)
+        df_r[r] = np.exp(df_r['log_gross_r']) - 1
+        df_r = df_r.drop(['log_gross_r'], axis=1)
     # resample other variables
     df_vars = None
-    if len(vars) >0 and vars is not None:
+    if len(vars) > 0 and vars is not None:
         df_vars = data[[time, name] + vars].groupby(name).resample(strs[to_freq], on=time)
         if var_agg_rule == 'last':
             df_vars = df_vars.last()
@@ -194,15 +189,13 @@ def downsample_from_daily(data, time, name, r: str, vars: List[str], to_freq: st
             df_vars = df_vars.mean()
         elif var_agg_rule == 'sum':
             df_vars = df_vars.sum()
-        # update dataframe index to match with FF risk models
+    # update dataframe index to match with FF risk models
     if df_r is not None and df_vars is not None:
         return df_r.join(df_vars).reset_index()
-    elif df_r is None and  df_vars is not None:
+    elif df_r is None and df_vars is not None:
         return df_vars.reset_index()
     elif df_r is not None and df_vars is None:
         return df_r.reset_index()
-
-
 
 
 def download_stk_return(start_date, end_date, symbols):
@@ -218,11 +211,12 @@ def download_stk_return(start_date, end_date, symbols):
         hist = yf.Ticker(symbol).history(start=start_date, end=end_date, auto_adjust=False).reset_index()
         hist['r'] = hist[['Adj Close']].pct_change()
         hist['ticker'] = symbol
-        hists= hists.append(hist)
+        hists = hists.append(hist)
     return hists
 
-def allocate_leveraged_asset(r, bechmark_r, leverage: int, weight_target:float, weight_deviation:float,
-                             report = True, output='output.html'):
+
+def allocate_leveraged_asset(r, bechmark_r, leverage: int, weight_target: float, weight_deviation: float,
+                             report=True, output='output.html'):
     """
     allocate between a single leveraged asset and fiat
     r: Pandas series returns with time index
@@ -235,17 +229,18 @@ def allocate_leveraged_asset(r, bechmark_r, leverage: int, weight_target:float, 
     levered_r = leverage * r
     for i in levered_r[:-1]:
         weight = weight * (1 + i) / (weight * (1 + i) + 1 - weight)
-        weight = weight\
+        weight = weight \
             if np.abs(weight - weight_target) < weight_deviation \
             else weight_target
         weights.append(max(weight, 0))
     result = levered_r.to_frame(name='levered_r')
     result['r'] = r
     result['weight'] = weights
-    result['port_r'] = result['weight']*result['levered_r']
+    result['port_r'] = result['weight'] * result['levered_r']
     if report == True:
-        quantstats.reports.html(result['port_r'], bechmark_r,output=output)
+        quantstats.reports.html(result['port_r'], bechmark_r, output=output)
     return result
+
 
 def get_drawdowns(r):
     """
@@ -255,8 +250,7 @@ def get_drawdowns(r):
     return drawdowns.abs()
 
 
-
-def get_tradingdays(date: str, start_date = '2019-01-01', end_date='2019-12-31', nth=5, market='NYSE'):
+def get_tradingdays(date: str, start_date='2019-01-01', end_date='2019-12-31', nth=5, market='NYSE'):
     """
     :param date:
     :param start_year:
@@ -268,10 +262,11 @@ def get_tradingdays(date: str, start_date = '2019-01-01', end_date='2019-12-31',
     trading_days = mcal.get_calendar(market).valid_days(start_date, end_date)
     try:
         trading_days_pd = pd.DataFrame({date: list(trading_days)}).iloc[::nth]
-        spark= SparkSession.builder.getOrCreate()
+        spark = SparkSession.builder.getOrCreate()
         return spark.createDataFrame(trading_days_pd.loc[trading_days_pd[date].notnull()])
     except ValueError as e:
         print(e)
+
 
 def multi_join(dfs: List[DataFrame], on: List[str], how='inner'):
     """
@@ -290,11 +285,13 @@ def print_duplicates(data: SparkDataframe, cols: List[str]) -> SparkDataframe:
         .drop('dupeCount') \
         .show()
 
+
 def SparktoPandas(data: SparkDataframe):
     data.write.mode('overwrite').parquet('temp')
-    df =  pd.read_parquet('temp')
+    df = pd.read_parquet('temp')
     shutil.rmtree('temp')
     return df
+
 
 def PandastoSpark(spark, data):
     data.to_parquet('temp.parquet', index=False)
@@ -302,33 +299,35 @@ def PandastoSpark(spark, data):
     os.remove('temp.parquet')
     return df
 
+
 def select_CRSP_common_stocks(data):
-    return   data.filter((f.col('shrcd') == 10) | (f.col('shrcd') == 11) | (f.col('shrcd') == 12) | (f.col('shrcd') == 18) |
-            (f.col('shrcd') == 30) | (f.col('shrcd') == 31))
+    return data.filter(
+        (f.col('shrcd') == 10) | (f.col('shrcd') == 11) | (f.col('shrcd') == 12) | (f.col('shrcd') == 18) |
+        (f.col('shrcd') == 30) | (f.col('shrcd') == 31))
 
 
-def select_calls(data, time:str, stock_id:str, option_id:str,
-                exp_date: str, exp_days: str, strik_price: str, stock_prc_lag:str,
-                min_exp_days: int, min_strike_delta: float) -> tuple:
-
+def select_calls(data, time: str, stock_id: str, option_id: str,
+                 exp_date: str, exp_days: str, strik_price: str, stock_prc_lag: str,
+                 min_exp_days: int, min_strike_delta: float) -> tuple:
     window = Window.partitionBy(time, stock_id)
     select_exdays = data \
         .filter(f.col(exp_days) >= min_exp_days) \
         .withColumn('min_exp_days', f.min(exp_days).over(window)) \
         .filter(f.col(exp_days) == f.col('min_exp_days')) \
         .drop('min_exp_days')
-    select_strike_variable = select_exdays\
+    select_strike_variable = select_exdays \
         .filter(f.col(strik_price) >= f.col(stock_prc_lag) * (1 + min_strike_delta)) \
         .withColumn('min_call_strike', f.min(strik_price).over(window)) \
         .filter(f.col(strik_price) == f.col('min_call_strike')) \
         .drop('min_call_strike')
-    calls_fixed = select_strike_variable\
+    calls_fixed = select_strike_variable \
         .withColumn(option_id, f.first(option_id).over(Window.partitionBy(exp_date).orderBy(time))) \
         .select(time, option_id)
     select_strike_fixed = calls_fixed.join(data, on=[time, option_id])
     return select_strike_variable, select_strike_fixed
 
-def select_puts(data, time:str, stock_identifier:str, min_exp_days: int, min_strike_pct: float,
+
+def select_puts(data, time: str, stock_identifier: str, min_exp_days: int, min_strike_pct: float,
                 exp_days: str, strik_price: str, stock_prc: str) -> SparkDataframe:
     window = Window.partitionBy(time, stock_identifier)
     select_exdays = data \
@@ -336,30 +335,33 @@ def select_puts(data, time:str, stock_identifier:str, min_exp_days: int, min_str
         .withColumn('min_exp_days', f.min(exp_days).over(window)) \
         .filter(f.col(exp_days) == f.col('min_exp_days')) \
         .drop('min_exp_days')
-    select_strike = select_exdays\
+    select_strike = select_exdays \
         .withColumn('max_put_strike', f.col(stock_prc) * (1 - min_strike_pct)) \
         .filter(f.col(strik_price) <= f.col('max_put_strike')) \
         .withColumn('max_put_strike', f.max(strik_price).over(window)) \
-        .filter(f.col(strik_price) == f.col('max_put_strike'))\
+        .filter(f.col(strik_price) == f.col('max_put_strike')) \
         .drop('max_put_strike')
     return select_strike
 
-def profile_data(data, n_rows = 100000, file_name = 'report.html'):
-    total_rows =  data.count()
-    print('Number of observations:',total_rows)
-    pdf = data.sample(fraction=n_rows/total_rows).toPandas()
+
+def profile_data(data, n_rows=100000, file_name='report.html'):
+    total_rows = data.count()
+    print('Number of observations:', total_rows)
+    pdf = data.sample(fraction=n_rows / total_rows).toPandas()
     ProfileReport(pdf, title="Pandas Profiling Report", explorative=True).to_file(file_name)
 
-def analyze_data(data, outlier_method='std', outlier_distance:float=2):
+
+def analyze_data(data, outlier_method='std', outlier_distance: float = 2):
     """
     outlier_method: std or IQR
     """
+
     def detect_outliers(col):
         if outlier_method == 'IQR':
             q3 = col.quantile(0.75)
             q1 = col.quantile(0.25)
             IQR = q3 - q1
-            count_bool = (col -  q3 >= IQR * outlier_distance) | (q1 - col  >=  IQR * n)
+            count_bool = (col - q3 >= IQR * outlier_distance) | (q1 - col >= IQR * n)
         elif outlier_method == 'std':
             count_bool = abs(col - col.mean()) >= col.std() * outlier_distance
         else:
@@ -367,19 +369,20 @@ def analyze_data(data, outlier_method='std', outlier_distance:float=2):
         return sum(count_bool)
 
     def analyse_col(col):
-        missing = sum(col.isnull())/n*100
-        unique =  len(col.unique())/n*100
-        imbalance = col.value_counts().values[0]/n*100
-        zero = sum(col==0)/n*100
+        missing = sum(col.isnull()) / n * 100
+        unique = len(col.unique()) / n * 100
+        imbalance = col.value_counts().values[0] / n * 100
+        zero = sum(col == 0) / n * 100
         try:
-            outlier =  detect_outliers(col)/n*100
+            outlier = detect_outliers(col) / n * 100
         except:
             outlier = np.nan
-        return pd.Series({'missing %': missing, 'zero %': zero, 'unique %': unique, 'most value count %':imbalance,
-                          'outlier %':outlier, 'min': col.min(), 'max':col.max()})
+        return pd.Series({'missing %': missing, 'zero %': zero, 'unique %': unique, 'most value count %': imbalance,
+                          'outlier %': outlier, 'min': col.min(), 'max': col.max()})
+
     n = len(data)
     print('Analyzing data...')
-    return data.apply(analyse_col, axis = 0).transpose()
+    return data.apply(analyse_col, axis=0).transpose()
 
 
 def select_cols_by_corr(data, target: str, num_features: List[str], corr_max):
@@ -399,7 +402,8 @@ def select_cols_by_corr(data, target: str, num_features: List[str], corr_max):
                 else:
                     correlated_features.append(col)
                     skipped_rows.append(j)
-    return data.drop(correlated_features, axis =  1)
+    return data.drop(correlated_features, axis=1)
+
 
 def select_cols_by_na(data, na_pct_max):
     n = len(data)
@@ -410,6 +414,6 @@ def select_cols_by_na(data, na_pct_max):
         if missing <= na_pct_max:
             selected_cols.append(col)
         else:
-            print(f'Removing {col} with {np.round(missing*100,2)}% missing values!')
+            print(f'Removing {col} with {np.round(missing * 100, 2)}% missing values!')
     print(f'{len(cols)} columns before removing NA, {len(selected_cols)} columns left after remove NA.')
     return data[list(selected_cols)]
