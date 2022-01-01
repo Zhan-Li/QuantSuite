@@ -57,9 +57,6 @@ class PortfolioAnalysis:
         # self.symbols_all = self.data[self.name].unique().tolist()
         self.portr = None
 
-    def get_IC(self):
-        return self.data.agg(f.corr(self.r, self.sig).alias('correlation'))
-
     def gen_portr(self, shift: int, ntile=None, sort_var2=None, ntile2=None, dependent_sort=True,
                   total_position=0, commission=0, turnover=0) -> PandasDataFrame:
         """
