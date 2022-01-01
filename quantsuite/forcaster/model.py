@@ -1,6 +1,7 @@
 from sklearn.base import BaseEstimator, ClassifierMixin
 import numpy as np
 import pandas as pd
+from quantsuite import get_port_r
 
 
 class WeightedAverage(BaseEstimator, ClassifierMixin):
@@ -10,7 +11,7 @@ class WeightedAverage(BaseEstimator, ClassifierMixin):
 
         Parameters
         ----------
-        weight : only support 'IC' and None temporarily. If weight is None, then use simple average.
+        weight : 'IC', 'SR', None temporarily. If weight is None, then use simple average.
         thresh : weight = 0 if abs(weight) <= thresh
         """
         self.thresh = thresh
@@ -36,6 +37,9 @@ class WeightedAverage(BaseEstimator, ClassifierMixin):
             temp = temp.dropna()
             if self.weight == 'IC':
                 res = temp.groupby(temp.index).apply(lambda x: x.corr().iloc[0, 1]).mean()
+            elif self.weight == 'SR':
+                r = get_port_r(temp['y'], temp['x'])
+                res = r.mean() / r.std()
             if abs(res) <= self.thresh:
                 coef.append(0)
             else:
