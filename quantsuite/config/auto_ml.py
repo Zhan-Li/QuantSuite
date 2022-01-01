@@ -13,8 +13,8 @@ auto_ml_config = {
         'model': RandomForestRegressor()
     },
 
-    'weighted_average_ic':{
+    'weighted_average':{
         'params': {'thresh': tune.quniform(0.001, 0.02, 0.001)
                    },
-        'model': WeightedAverage(weight='IC')}
+        'model': WeightedAverage()}
 }
