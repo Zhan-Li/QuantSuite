@@ -1,12 +1,14 @@
 # This script download data from mysql database
-import pandas as pd
 import json
-from sqlalchemy import create_engine, insert, Table, MetaData
+
+import pandas as pd
+from sqlalchemy import create_engine
+
 # global params
 with open('secret.json') as myfile:
     secrets = json.load(myfile)
 usr = secrets['mysql_usr']
-pin= secrets['mysql_password']
+pin = secrets['mysql_password']
 start = '1996-01-01'
 # import option signals from mysql
 optionsig_connection = create_engine(f'mysql+pymysql://{usr}:{pin}@localhost/option_sig')
@@ -21,5 +23,5 @@ crsp = pd.read_sql(f"SELECT date, cusip, mktcap, ret FROM stock WHERE date >='{s
 crsp = crsp.sort_values('date')
 stock = crsp
 for i in dfs:
-    stock = stock.merge(i, on = ['date', 'cusip'])
+    stock = stock.merge(i, on=['date', 'cusip'])
 stock.to_pickle('data/return_prediction.pkl')
