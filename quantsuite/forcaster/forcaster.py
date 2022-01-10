@@ -13,7 +13,7 @@ from sqlalchemy import MetaData, Table
 from tpot import TPOTRegressor
 from quantsuite.performance_evaluation import PerformanceEvaluation
 from quantsuite.portfolio_analysis import PortfolioAnalysis
-
+from quantsuite.forcaster.scorer import  IC
 
 class TrainTestSplitter:
     """Split time series into train test datasets"""
@@ -96,6 +96,8 @@ class Forecaster:
     Wrapper around sklearn and tpot, tailored for time-series return prediction.
     """
 
+    scorers = {'IC': IC}
+
     def __init__(self, x_train, y_train, cv_train):
         self.x_train = x_train
         self.y_train = y_train
@@ -122,7 +124,7 @@ class Forecaster:
             search_optimization="hyperopt",
             n_trials=n_trial,
             early_stopping=False,
-            scoring=scoring,
+            scoring=self.scorers[scoring] if type(scoring) == str else scoring,
             cv=self.cv_train,
             max_iters=1,
             verbose=verbose,
