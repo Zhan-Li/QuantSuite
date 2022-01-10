@@ -1,13 +1,13 @@
 from binance.client import Client
 import re
-import binance_functions as binance_funcs
+import quantsuite.trader.binance as binance_funcs
 import pandas as pd
 import pyspark.sql.functions as f
 from pyspark.conf import SparkConf
 from pyspark.sql import SparkSession, Window
-import data_manipulator
+from quantsuite import DataManipulator
 import numpy as np
-from sig_technical import TechnicalSignal
+from quantsuite.signals import TechnicalSignal
 # pandas options
 pd.set_option('display.max_rows', 100)
 pd.set_option('display.width', None)
@@ -44,12 +44,12 @@ data = spark.createDataFrame(hist).select('symbol', 'open_time', 'r')
 BTC = data.filter(f.col('symbol') == 'BTCUSDT').select('open_time', f.col('r').alias('r_BTC'))
 data = data.join(BTC, on='open_time')
 
-data = data_manipulator.add_r(data, 'symbol', 'open_time', 'r', 0, 0, 'lastr')
-data = data_manipulator.add_cross_section_zscore(data, 'open_time', 'lastr', 'lastr_zscore')
+data = DataManipulator().add_r(data, 'symbol', 'open_time', 'r', 0, 0, 'lastr')
+data = DataManipulator().add_cross_section_zscore(data, 'open_time', 'lastr', 'lastr_zscore')
 data = TechnicalSignal(data, 'symbol', 'open_time', 'r', -10, 0)\
     .add_comovement('r_BTC', 'comov').drop('comov', 'comov_up')
-data = data_manipulator.add_avg(data, 'symbol', 'open_time', 'comov_down', -20, 0, 'comov_down_avg')
-data = data_manipulator.add_cross_section_zscore(data, 'open_time', 'comov_down_avg', 'comov_down_avg_zscore')
+data = DataManipulator().add_avg(data, 'symbol', 'open_time', 'comov_down', -20, 0, 'comov_down_avg')
+data = DataManipulator().add_cross_section_zscore(data, 'open_time', 'comov_down_avg', 'comov_down_avg_zscore')
 data = data.withColumn('sig_merged', (-f.col('lastr_zscore')-f.col('comov_down_avg_zscore'))/2)
 data = data\
     .withColumn('max_open_time', f.max('open_time').over(Window.partitionBy('symbol'))) \
@@ -68,14 +68,14 @@ firstOrders = merged.loc[merged['targetPosition'] == 0]
 for index, row in firstOrders.iterrows():
     base_symbol = re.search('(.*)USDT', row['symbol']).group(1)
     target_position = row['targetPosition']
-    binance_funcs.order(client, base_symbol, target_position, filters)
+    binance_funcs.order(client, base_symbol, target_position)
 
 secondOrders = merged.loc[merged['targetPosition'] < 0]
 for index, row in secondOrders.iterrows():
     base_symbol = re.search('(.*)USDT', row['symbol']).group(1)
     print('Processing', base_symbol)
     target_position = row['targetPosition']
-    binance_funcs.order(client, base_symbol, target_position,filters)
+    binance_funcs.order(client, base_symbol, target_position)
 
 
 thirdOrders = merged.loc[merged['targetPosition'] > 0]
@@ -83,9 +83,9 @@ for index, row in thirdOrders.iterrows():
     base_symbol = re.search('(.*)USDT', row['symbol']).group(1)
     print('Processing', base_symbol)
     target_position = row['targetPosition']
-    binance_funcs.order(client, base_symbol, target_position,filters)
+    binance_funcs.order(client, base_symbol, target_position)
 
-binance_funcs.order(client, base_symbol, target_position,filters)
+binance_funcs.order(client, base_symbol, target_position)
 
 # helper function to reduce all position to 0
 # for index, row in merged.iterrows():
@@ -93,7 +93,7 @@ binance_funcs.order(client, base_symbol, target_position,filters)
 #     print('Processing', base_symbol)
 #     binance_funcs.order(client, base_symbol, 0,filters)
 
-from binance.websockets import BinanceSocketManager
+from binance import BinanceSocketManager
 bm = BinanceSocketManager(client)
 # start any sockets here, i.e a trade socket
 def process_message(msg):
