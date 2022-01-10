@@ -5,29 +5,19 @@
 3. Imposing selecting unique tickers when selecting by perf generally results in poorer performance compared with
     duplicate tickers.
 """
-##### import the necessary modules and set chart style####
-import numpy as np
-import pandas as pd
-import seaborn as sns
-import pandas_datareader.data as web
-import matplotlib.pylab as plt
-from datetime import datetime
-import statsmodels.api as sm
-from statsmodels.regression.rolling import RollingOLS
-from pykalman import KalmanFilter
-from math import sqrt
-import time
-import utilities as utils
 import importlib
+
+##### import the necessary modules and set chart style####
+import pandas as pd
+
 import pairs_trading
 
 importlib.reload(pairs_trading)
-from pairs_trading import PairsTrading
+from quantsuite.pairs_trading import PairsTrading
 from joblib import Memory
 
 location = './cachedir'
 memory = Memory(location, verbose=0)
-from sklearn.model_selection import ParameterGrid
 
 
 # remove columns with high percentage of na
@@ -91,15 +81,11 @@ perfs_combined = perfs.merge(perfs2, on=['x', 'y']).drop(['p_val0_x', 'p_val0_y'
 import statsmodels.api as sm
 
 x = perfs_combined[['sharpe_ratio_x', 'cum_r_x', 'p_val_x']]
-X = sm.add_constant(X)
+X = sm.add_constant(x)
 Y = perfs_combined['sharpe_ratio_y']
 model = sm.OLS(Y, X)
 results = model.fit()
-results.params
-results.tvalues
-results.rsquared
 ## Machine Learning
-from sklearn.linear_model import LinearRegression, Lasso, Ridge, ElasticNet
 from sklearn.model_selection import RandomizedSearchCV
 from scipy.stats import randint, uniform
 from sklearn.metrics import mean_squared_error
@@ -128,4 +114,3 @@ hrspread2 = pt.get_spreads(val, pairs=pairs)
 r_position2, _ = pt.get_perf(data=val, pairs=pairs, hr_spread=hrspread2)
 r = r_position2['port_r']
 quantstats.reports.html(r, 'SPY', output='report2.html')
-
