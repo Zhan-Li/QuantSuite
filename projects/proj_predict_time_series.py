@@ -1,31 +1,15 @@
 # evaluate signal using stocks as investment
+
+import matplotlib.pyplot as plt
 import pandas as pd
 import pyfolio
-import numpy as np
-import matplotlib.pyplot as plt
-from pyspark.sql import SparkSession, Window
-from pyspark import StorageLevel
-from pyspark.sql.types import DoubleType, IntegerType, StringType, DateType, TimestampType
 from pyspark.conf import SparkConf
-from pyspark.sql.functions import year, max, exp, sum, mean,lead, first, lag, lit, pandas_udf, col, rand, corr, log, when
-import sys
-import joblib
-import json
-import importlib
-import utilities as utils; importlib.reload(utils)
-
-import option_signal; importlib.reload(option_signal)
-from option_signal import OptionMetricsSignal
-
-import portforlio; importlib.reload(portforlio)
-from portforlio import Portfolio
-
-import sig_evaluator; importlib.reload(sig_evaluator)
-from sig_evaluator import SignalEvaluator
-
-import data_manipulator; importlib.reload(data_manipulator)
-
-from sklearn.model_selection import ParameterGrid
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import year, col, when
+from quantsuite.signals import OptionSignal
+from quantsuite import DataManipulator
+import quantsuite.misc_funcs as utils
+from quantsuite import PerformanceEvaluation
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -53,39 +37,40 @@ exdays_min = 0
 opt_vol_min = 0
 opt_prc_min = 0
 # read stock returns
-sec = spark.read.parquet('/Volumes/Data/Google Drive/WRDS/CRSP/dsf_linked').filter(year('date') >= 2007)\
-    .select('date', 'cusip', 'ret', 'ticker', 'prc', 'vol_avg', 'vol_c_avg', 'stddev', 'mktcap')\
+sec = spark.read.parquet('/Volumes/Data/Google Drive/WRDS/CRSP/dsf_linked').filter(year('date') >= 2007) \
+    .select('date', 'cusip', 'ret', 'ticker', 'prc', 'vol_avg', 'vol_c_avg', 'stddev', 'mktcap') \
     .filter(col('ticker') == 'SPY')
 # generate signal
-opt = spark.read.parquet(f'/Volumes/Data/Google Drive/WRDS/OPTIONM/opprcd_2007_2010')\
+opt = spark.read.parquet(f'/Volumes/Data/Google Drive/WRDS/OPTIONM/opprcd_2007_2010') \
     .unionByName(spark.read.parquet(f'/Volumes/Data/Google Drive/WRDS/OPTIONM/opprcd_2011_2014')) \
     .filter(year('date') == 2007)
-sig = OptionMetricsSignal(opt_file=opt, sec_file=sec) \
+sig = OptionSignal(opt_file=opt, sec_file=sec) \
     .gen_elasticity_sig(sig_col=sig_name, delta_col='delta', sec_prc='prc', vol_above='opt_vol', vol_below='opt_vol',
                         exdays_max=exdays_max, exdays_min=exdays_min, opt_vol_min=opt_vol_min,
                         opt_prc_min=opt_prc_min).cache()
-sig_avg = data_manipulator.gen_avg(data=sig, name=['cusip', 'cp_flag'], time='date', value='elasticity', lookback=4,
+sig_avg = DataManipulator().gen_avg(data=sig, name=['cusip', 'cp_flag'], time='date', value='elasticity', lookback=4,
                                    avg_col='elasticity_avg')
-sig_C = sig_avg.filter(col('cp_flag') == 'C')\
-    .withColumnRenamed('elasticity', 'elasticity_C')\
+sig_C = sig_avg.filter(col('cp_flag') == 'C') \
+    .withColumnRenamed('elasticity', 'elasticity_C') \
     .withColumnRenamed('elasticity_avg', 'elasticity_avg_C')
-sig_P = sig_avg.filter(col('cp_flag') == 'P')\
-    .withColumnRenamed('elasticity', 'elasticity_P')\
+sig_P = sig_avg.filter(col('cp_flag') == 'P') \
+    .withColumnRenamed('elasticity', 'elasticity_P') \
     .withColumnRenamed('elasticity_avg', 'elasticity_avg_P')
-sig_merged = sig_P.join(sig_C, on=['date', 'cusip'], how='inner')\
-    .withColumn('elasticity_spread1', (col('elasticity_C') + col('elasticity_P')))\
-    .withColumn('elasticity_spread2', (col('elasticity_C') + col('elasticity_P'))/(col('elasticity_C') - col('elasticity_P')))
+sig_merged = sig_P.join(sig_C, on=['date', 'cusip'], how='inner') \
+    .withColumn('elasticity_spread1', (col('elasticity_C') + col('elasticity_P'))) \
+    .withColumn('elasticity_spread2',
+                (col('elasticity_C') + col('elasticity_P')) / (col('elasticity_C') - col('elasticity_P')))
 # general return
-sec_cumr = data_manipulator.gen_cum_r(data=sec, name=['cusip'], value='ret', time='date', cum_r='cum_r')
-sec_r = data_manipulator.gen_forward_r(data=sec_cumr, name=['cusip'], time='date', bid='cum_r', offer='cum_r').cache()
+sec_cumr =  DataManipulator().gen_cum_r(data=sec, name=['cusip'], value='ret', time='date', cum_r='cum_r')
+sec_r =  DataManipulator().gen_forward_r(data=sec_cumr, name=['cusip'], time='date', bid='cum_r', offer='cum_r').cache()
 ## merge signals with stocks
-merged = sig_merged\
+merged = sig_merged \
     .join(sec_r, on=['cusip', 'date'], how='inner').sort('cusip', 'date').cache()
 
 # trade
 quantile_C = merged.approxQuantile("elasticity_C", [0.5], 0)[0]
 quantile_P = merged.approxQuantile("elasticity_P", [0.5], 0)[0]
-merged = merged\
+merged = merged \
     .withColumn('position',
                 when((col('elasticity_C') >= quantile_C) | (col('elasticity_P') <= quantile_P), 1).otherwise(0)) \
     .withColumn('r', col('position') * col('forward_r'))
@@ -94,9 +79,9 @@ df = merged.toPandas().set_index('date')
 r = 'r'
 pyfolio.create_returns_tear_sheet(df[r])
 plt.savefig('yo.png')
-eva = SignalEvaluator(df[[r]], r, 'daily')
+eva = PerformanceEvaluation(df[[r]], r, 'daily')
 eva.get_full_perf()
 # compared with the market
 benchmarket = utils.download_return(2007, 2014, 'SPY')
-eva = SignalEvaluator(benchmarket, 'r', 'daily')
+eva = PerformanceEvaluation(benchmarket, 'r', 'daily')
 eva.get_full_perf()
