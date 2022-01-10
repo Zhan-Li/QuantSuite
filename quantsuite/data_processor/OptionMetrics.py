@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession, Window, DataFrame
 from pyspark.sql.types import DoubleType, IntegerType, StringType, DateType, TimestampType
 import pyspark.sql.functions as f
-from data_processor.common import *
+from quantsuite.data_processor.common import *
 
 
 usr, pin = get_mysql_secret()
@@ -9,8 +9,9 @@ spark = init_spark()
 #params
 start_year=1996
 end_year=2020
-opt_folder='data/option_prices/'
-secnmd_file='data/secnmd.sas7bdat'
+prefix = '/media/zhan/NAS/Google Drive/WRDS/OPTIONM/'
+opt_folder=prefix + 'option_prices/'
+secnmd_file=prefix + 'secnmd.sas7bdat'
 CHECK_DATA = False
 # combine all option files
 
@@ -61,4 +62,5 @@ option = option \
     .filter(f.col('effect_date') == f.col('most_recent_effect_date')) \
     .drop('effect_date', 'most_recent_effect_date')
 
-write_to_mysql(option, 'locahost/optionmetrics', 'optionmetrics', usr, pin)
+option.write.mode('overwrite').parquet('/media/zhan/data/option_processed')
+#write_to_mysql(option, 'locahost/optionmetrics', 'optionmetrics', usr, pin)
