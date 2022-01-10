@@ -1,23 +1,23 @@
-from pyspark.sql import SparkSession, Window, DataFrame
-from pyspark.sql.types import DoubleType, IntegerType, StringType, DateType, TimestampType
 import pyspark.sql.functions as f
-from quantsuite.data_processor.common import *
+from pyspark.sql import Window
+from pyspark.sql.types import IntegerType, TimestampType
 
+from quantsuite.data_processor.common import *
 
 usr, pin = get_mysql_secret()
 spark = init_spark()
-#params
-start_year=1996
-end_year=2020
+# params
+start_year = 1996
+end_year = 2020
 prefix = '/media/zhan/NAS/Google Drive/WRDS/OPTIONM/'
-opt_folder=prefix + 'option_prices/'
-secnmd_file=prefix + 'secnmd.sas7bdat'
+opt_folder = prefix + 'option_prices/'
+secnmd_file = prefix + 'secnmd.sas7bdat'
 CHECK_DATA = False
 # combine all option files
 
 option = sas_to_parquet(spark, f'{opt_folder}opprcd{start_year}.sas7bdat')
 for option_year in range(start_year + 1, end_year + 1):
-    df = sas_to_parquet(spark,f'{opt_folder}opprcd{option_year}.sas7bdat')
+    df = sas_to_parquet(spark, f'{opt_folder}opprcd{option_year}.sas7bdat')
     option = option.unionByName(df)
 # process option data
 option = option \
@@ -63,4 +63,4 @@ option = option \
     .drop('effect_date', 'most_recent_effect_date')
 
 option.write.mode('overwrite').parquet('/media/zhan/data/option_processed')
-#write_to_mysql(option, 'locahost/optionmetrics', 'optionmetrics', usr, pin)
+# write_to_mysql(option, 'locahost/optionmetrics', 'optionmetrics', usr, pin)
