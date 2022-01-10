@@ -1,14 +1,11 @@
 from binance.client import Client
-import importlib
 import re
 import binance_functions as binance_funcs
-importlib.reload(binance_funcs)
 import pandas as pd
 import pyspark.sql.functions as f
 from pyspark.conf import SparkConf
-from pyspark.sql import SparkSession, Window, DataFrame
+from pyspark.sql import SparkSession, Window
 import data_manipulator
-importlib.reload(data_manipulator)
 import numpy as np
 from sig_technical import TechnicalSignal
 # pandas options
