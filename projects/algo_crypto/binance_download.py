@@ -1,5 +1,5 @@
 from binance.client import Client
-import binance_functions
+import quantsuite.trader.binance as binance_funcs
 import json
 with open('secret.json') as f:
         keys = json.load(f)
@@ -8,7 +8,7 @@ client = Client(keys['binance_api_key'], keys['binance_api_secret'])
 #all_symbols, count = get_number_of_coins(client)
 
 
-isolated_margin_USDT = binance_functions.get_all_isolated_margin_symbols(client)
+isolated_margin_USDT = binance_funcs.get_all_isolated_margin_symbols(client)
 isolated_margin_USDT = [i+'USDT' for i in isolated_margin_USDT]
 
 args = [{'interval': client.KLINE_INTERVAL_1MINUTE, 'output': 'data/crypto_1m.pkl'},
@@ -29,7 +29,7 @@ args = [{'interval': client.KLINE_INTERVAL_1MINUTE, 'output': 'data/crypto_1m.pk
 args.reverse()
 for arg in args:
     print('working on', arg)
-    hist = binance_functions.download_hist(binance_client=client, symbols=isolated_margin_USDT, interval=arg['interval'])
+    hist = binance_funcs.download_hist(binance_client=client, symbols=isolated_margin_USDT, interval=arg['interval'])
     hist.to_pickle(arg['output'])
 
 
