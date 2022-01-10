@@ -1,7 +1,9 @@
-import pandas as pd
-from quantsuite.trader import Algo
-from ib_insync import IB, IBC
 import datetime
+
+import pandas as pd
+from ib_insync import IB, IBC
+
+from quantsuite.trader import Algo
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', 100)
@@ -18,7 +20,7 @@ ib = IB()
 ib.connect('127.0.0.1', 1983, clientId=1)
 # download hist_volume ------------------------------
 algo = Algo(ib)
-#algo.save_avg_hist_volume()
+# algo.save_avg_hist_volume()
 # trade ------------------------------
 now = datetime.datetime.now()
 start_time = now.replace(hour=14, minute=45, second=0, microsecond=0)
@@ -31,4 +33,3 @@ while bool(open_orders) is True and now > start_time:
 
 # report --------------
 algo.report()
-
