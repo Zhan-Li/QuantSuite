@@ -1,10 +1,11 @@
+from typing import List
+
 import pyspark.sql.functions as f
 from pyspark.sql import DataFrame as SparkDataFrame
-from typing import List
 
 
 class OptionSignal:
-    def __init__(self, data: SparkDataFrame, time: str, sec_name: str,cp_flag: str, call_str: str, put_str: str,
+    def __init__(self, data: SparkDataFrame, time: str, sec_name: str, cp_flag: str, call_str: str, put_str: str,
                  weight='None'):
         """
 
@@ -66,7 +67,8 @@ class OptionSignal:
                 .withColumn(sig_agg + '_' + i, f.col('numerator') / f.col('denominator')) \
                 .drop('numerator', 'denominator')
         # spread based on both calls and puts with put signals as negative
-        data = self.data.withColumn(sig, f.when(f.col(self.cp_flag) == self.put_str, -1*f.col(sig)).otherwise(f.col(sig)))
+        data = self.data.withColumn(sig,
+                                    f.when(f.col(self.cp_flag) == self.put_str, -1 * f.col(sig)).otherwise(f.col(sig)))
         sigs['spread2'] = data.groupby(group_vars) \
             .agg(f.sum(f.col(sig) * f.abs(self.weight)).alias('numerator'),
                  f.sum(f.abs(self.weight)).alias('denominator')) \
@@ -77,10 +79,11 @@ class OptionSignal:
             .join(sigs[self.put_str], on=group_vars) \
             .join(sigs['avg'], on=group_vars) \
             .withColumn(sig_agg + '_ratio', f.col(sig_agg + '_' + self.call_str) / f.col(sig_agg + '_' + self.put_str)) \
-            .withColumn(sig_agg + '_spread1', f.col(sig_agg + '_' + self.call_str) - f.col(sig_agg + '_' + self.put_str)) \
+            .withColumn(sig_agg + '_spread1',
+                        f.col(sig_agg + '_' + self.call_str) - f.col(sig_agg + '_' + self.put_str)) \
             .join(sigs['spread2'], on=group_vars)
 
-     # option price and stock price ratio
+    # option price and stock price ratio
     def gen_os_p(self, os_p, sig_name='os_p') -> SparkDataFrame:
         """
         os_p: option to stock price ratio
@@ -134,7 +137,7 @@ class OptionSignal:
         self.data = self.data \
             .withColumn('ks<=1', f.when(f.col(ks) <= 1, 'ks<=1').otherwise('ks>1'))
         # pivot by ks <= 1
-        return self.gen_aggregate_sig(IV, 'IV', ['ks<=1'])\
+        return self.gen_aggregate_sig(IV, 'IV', ['ks<=1']) \
             .drop('IV_spread') \
             .groupby(self.time, self.sec_name).pivot('ks<=1', ['ks<=1', 'ks>1']) \
             .agg(f.max('IV_C').alias('IV_C'), f.max('IV_P').alias('IV_P'), f.max('IV_avg').alias('IV_avg')) \

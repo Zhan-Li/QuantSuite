@@ -1,13 +1,13 @@
+import math
+from typing import List
+
+import pandas as pd
 from binance.client import Client
 from binance.enums import *
 from binance.exceptions import BinanceAPIException
-import pandas as pd
-from typing import List
-import math
-import time
-import datetime
 from pandas import DataFrame as PandasDataFrame
-import numpy as np
+
+
 # [
 #   [
 #     1499040000000,      // Open time
@@ -38,19 +38,21 @@ def convert_klines_to_dataframe(klines):
         klines_df[col] = klines_df[col].astype(float)
     return pd.DataFrame(klines_df)
 
-def download_hist(binance_client: Client, symbols:List[str], interval=Client.KLINE_INTERVAL_12HOUR,
+
+def download_hist(binance_client: Client, symbols: List[str], interval=Client.KLINE_INTERVAL_12HOUR,
                   start_str="1 Jan, 2009", end_str=None):
-    data=pd.DataFrame()
+    data = pd.DataFrame()
     for symbol in symbols:
         klines = binance_client.get_historical_klines(symbol, interval, start_str, end_str, limit=1000)
         if klines is not None:
             klines_df = convert_klines_to_dataframe(klines)
             klines_df = klines_df.drop_duplicates('open_time', keep='last')
             klines_df['symbol'] = symbol
-            data=data.append(klines_df)
+            data = data.append(klines_df)
     data['r'] = data['open'].pct_change()
     col_arranged = ['symbol', 'open_time', 'close_time', 'r']
     return data.reindex(col_arranged + [i for i in data.columns if i not in col_arranged], axis=1)
+
 
 def get_spot_USDT_balances(binance_client: Client, quote='USDT'):
     spot_balance = pd.DataFrame(binance_client.get_account()['balances'])
@@ -58,27 +60,29 @@ def get_spot_USDT_balances(binance_client: Client, quote='USDT'):
     spot_balance['locked'] = spot_balance['locked'].astype(float)
     return spot_balance.loc[spot_balance['asset'] == quote].iloc[0]['free']
 
+
 def get_isolated_margin_account(binance_client, quote='USDT'):
     assets = binance_client.get_isolated_margin_account()['assets']
     symbol = pd.DataFrame([asset['symbol'] for asset in assets], columns=['symbol'])
 
-    asset_cols = ['asset', 'free', 'locked','totalAsset', 'borrowed', 'interest', 'netAsset']
+    asset_cols = ['asset', 'free', 'locked', 'totalAsset', 'borrowed', 'interest', 'netAsset']
     base_asset = pd.DataFrame([asset['baseAsset'] for asset in assets])[asset_cols]
-    base_asset.columns = ['base_'+i for i in base_asset.columns]
+    base_asset.columns = ['base_' + i for i in base_asset.columns]
     quote_asset = pd.DataFrame([asset['quoteAsset'] for asset in assets])[asset_cols]
-    quote_asset.columns = ['quote_'+i for i in quote_asset.columns]
+    quote_asset.columns = ['quote_' + i for i in quote_asset.columns]
     account = pd.concat([symbol, base_asset, quote_asset], axis=1)
 
     prices = pd.DataFrame(binance_client.get_all_tickers())
     account = account.merge(prices, on='symbol')
 
-    num_cols =[i for i in account.columns if  i not in ['symbol','base_asset', 'quote_asset']]
+    num_cols = [i for i in account.columns if i not in ['symbol', 'base_asset', 'quote_asset']]
     for col in num_cols:
         account[col] = account[col].astype(float)
 
     account['base_netAssetOfQuote'] = account['base_netAsset'] * account['price']
     account['totalEquity'] = account['base_netAssetOfQuote'] + account['quote_netAsset']
-    return account.loc[account['quote_asset']==quote]
+    return account.loc[account['quote_asset'] == quote]
+
 
 def get_symbol_filters(binance_client, quote='USDT'):
     """
@@ -97,8 +101,8 @@ def get_symbol_filters(binance_client, quote='USDT'):
         tickSizes.append(filters[0]['tickSize'])
         stepSizes.append(filters[2]['stepSize'])
 
-    symbolInfo=pd.DataFrame({'base': bases, 'quote': quotes, 'marginAllowed': marginAllowed,
-                             'tickSize': tickSizes, 'stepSize': stepSizes})
+    symbolInfo = pd.DataFrame({'base': bases, 'quote': quotes, 'marginAllowed': marginAllowed,
+                               'tickSize': tickSizes, 'stepSize': stepSizes})
     symbolInfo['tickPrecision'] = symbolInfo['tickSize'].str.extract('0.(.*1)', expand=False).str.len()
     symbolInfo['tickPrecision'] = symbolInfo['tickPrecision'].fillna(0)
     symbolInfo['tickPrecision'] = symbolInfo['tickPrecision'].astype(int)
@@ -107,24 +111,24 @@ def get_symbol_filters(binance_client, quote='USDT'):
     symbolInfo['stepPrecision'] = symbolInfo['stepPrecision'].astype(int)
     return symbolInfo.loc[symbolInfo['quote'] == quote]
 
-def get_bid_ask_spread(binance_client, base_symbols: List[str], quote = 'USDT'):
+
+def get_bid_ask_spread(binance_client, base_symbols: List[str], quote='USDT'):
     spreads = pd.DataFrame()
     for base_symbol in base_symbols:
-        orderBook = binance_client.get_order_book(symbol=base_symbol+quote)
+        orderBook = binance_client.get_order_book(symbol=base_symbol + quote)
         bids = pd.DataFrame(orderBook['bids'], columns=['bid', 'bidQuantity'])
         asks = pd.DataFrame(orderBook['asks'], columns=['ask', 'askQuantity'])
         df = pd.concat([bids, asks], axis=1)
-        df['symbol'] = base_symbol+quote
+        df['symbol'] = base_symbol + quote
         df['bid'] = df['bid'].astype(float)
         df['ask'] = df['ask'].astype(float)
         df['bidQuantity'] = df['bidQuantity'].astype(float)
         df['askQuantity'] = df['askQuantity'].astype(float)
-        df['spread'] = (df['ask']-df['bid'])/ ((df['ask']+df['bid'])/2)
-        df['bidValue'] = df['bid']* df['bidQuantity']
+        df['spread'] = (df['ask'] - df['bid']) / ((df['ask'] + df['bid']) / 2)
+        df['bidValue'] = df['bid'] * df['bidQuantity']
         df['askValue'] = df['ask'] * df['askQuantity']
         spreads = spreads.append(df.iloc[0])
     return spreads
-
 
 
 def get_all_isolated_margin_symbols(binance_client, quote='USDT') -> List:
@@ -138,6 +142,7 @@ def get_all_isolated_margin_symbols(binance_client, quote='USDT') -> List:
     base_symbols = symbols.loc[(symbols['quote'] == quote)]['base'].tolist()
     return [i for i in base_symbols if i not in excluded_symbols]
 
+
 def get_cross_margin_symbols(binance_client) -> List:
     fiat_symbols = ['USDT', 'BKRW', 'BUSD', 'EUR', 'TUSD', 'USDC', 'TRY', 'PAX', 'AUD', 'BIDR', 'BRL', 'DAI', 'GBP',
                     'IDRT', 'NGN', 'RUB', 'ZAR', 'UAH', 'BVND']
@@ -145,6 +150,7 @@ def get_cross_margin_symbols(binance_client) -> List:
     excluded_symbols = fiat_symbols + retired_symbol
     account = pd.DataFrame(binance_client.get_margin_account()['userAssets'])
     return [i for i in account['asset'] if i not in excluded_symbols]
+
 
 def create_all_isolated_margin_account(binance_client, quote='USDT'):
     symbols_USDT = get_all_isolated_margin_symbols(binance_client, quote)
@@ -154,15 +160,16 @@ def create_all_isolated_margin_account(binance_client, quote='USDT'):
         except BinanceAPIException as e:
             print(base_symbol, e)
 
+
 def round_down(num, precision):
-    return math.floor(num*10**precision)/(10**precision)
+    return math.floor(num * 10 ** precision) / (10 ** precision)
+
 
 def round_up(num, precision):
-    return math.ceil(num*10**precision)/(10**precision)
+    return math.ceil(num * 10 ** precision) / (10 ** precision)
 
 
-
-def order(binance_client:Client, base:str, targetQtyQuote:float, filters: PandasDataFrame,
+def order(binance_client: Client, base: str, targetQtyQuote: float, filters: PandasDataFrame,
           shortMarginLevel=1.51, longMarginLevel=2, quote='USDT', tradeFee=0.001):
     def replay_loan():
         account = get_isolated_margin_account(binance_client, quote)
@@ -217,7 +224,7 @@ def order(binance_client:Client, base:str, targetQtyQuote:float, filters: Pandas
         currentQtyQuote = BaseQuote['base_netAssetOfQuote']
         QtyHeld = BaseQuote['base_free']
         QtyBorrowed = BaseQuote['base_borrowed'] + BaseQuote['base_interest']
-        my_quantity = QtyHeld if currentQtyQuote >0 else QtyBorrowed
+        my_quantity = QtyHeld if currentQtyQuote > 0 else QtyBorrowed
         try:
             filledQtyQuote = 0
             counter = 0
@@ -229,8 +236,8 @@ def order(binance_client:Client, base:str, targetQtyQuote:float, filters: Pandas
                 order = binance_client.create_margin_order(
                     symbol=base + quote,
                     quantity=min(round_down((abs(currentQtyQuote - targetQtyQuote) - filledQtyQuote) / my_price,
-                                      quantityPrecision),
-                                 round_down(my_quantity,quantityPrecision)),
+                                            quantityPrecision),
+                                 round_down(my_quantity, quantityPrecision)),
                     side=SIDE_SELL if currentQtyQuote > 0 else SIDE_BUY,
                     price=round_down(my_price, tickPrecision),
                     sideEffectType='NO_SIDE_EFFECT',

@@ -1,6 +1,7 @@
-from sklearn.base import BaseEstimator, ClassifierMixin
 import numpy as np
 import pandas as pd
+from sklearn.base import BaseEstimator, ClassifierMixin
+
 from quantsuite import get_port_r
 
 
@@ -26,7 +27,7 @@ class WeightedAverage(BaseEstimator, ClassifierMixin):
         elif hasattr(X, 'shape'):
             n_cols = X.shape[1]
         if not self.weight:
-            self.coef_ = np.ones(n_cols)/sum(np.ones(n_cols))
+            self.coef_ = np.ones(n_cols) / sum(np.ones(n_cols))
             return self
         for i in range(n_cols):
             temp = y.to_frame(name='y')

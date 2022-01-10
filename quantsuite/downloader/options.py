@@ -1,6 +1,7 @@
-import yfinance as yf
-import pandas as pd
 import time
+
+import pandas as pd
+import yfinance as yf
 
 
 def scrape_options(ticker: str, min_exp_date=None, max_exp_date=None, pause=1):

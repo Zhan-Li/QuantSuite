@@ -1,14 +1,13 @@
 import re
-
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
-from pandas import DataFrame
-import yfinance as yf
 import time
+
 import numpy as np
+import pandas as pd
+import requests
+import yfinance as yf
+from bs4 import BeautifulSoup
+from pandas import DataFrame
 from tqdm import tqdm
-from typing import List
 
 
 class CountryETFDownloader:
@@ -65,7 +64,7 @@ class CountryETFDownloader:
         except Exception as e:
             print(e)
 
-    def download_country_ETFs(self, country: str = 'US', auto_adjust=True, pause = 1):
+    def download_country_ETFs(self, country: str = 'US', auto_adjust=True, pause=1):
         tickers = self.get_country_ETF_tickers(country)['ticker'].to_list()
         hists = pd.DataFrame()
         print(f'Downloading {country} ETF data')
