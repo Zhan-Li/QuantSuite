@@ -1,5 +1,5 @@
 import pandas as pd
-import quandl
+import nasdaqdatalink
 import json
 
 # pandas options
@@ -12,8 +12,8 @@ pd.set_option('display.expand_frame_repr', False)
 with open('../quantsuite/pairs_trading/secret.json') as f:
     keys = json.load(f)
     # download all tickers for US firms
-quandl.ApiConfig.api_key = keys['quandl_api']
-quandl.get_table('SHARADAR/TICKERS', table='SEP', paginate=True).to_pickle('sharadar_tickers.pkl')
+nasdaqdatalink.ApiConfig.api_key = keys['quandl_api']
+nasdaqdatalink.get_table('SHARADAR/TICKERS', table='SEP', paginate=True).to_pickle('sharadar_tickers.pkl')
 # download stock data
 tickers_meta = pd.read_pickle('sharadar_tickers.pkl')
 tickers = tickers_meta['ticker'].drop_duplicates().to_list()
@@ -23,7 +23,7 @@ while n1 <= len(tickers)-1:
     # quandl api has 1 million row limit. Sharadar has ten year data. Thus, 350 * 252*10 = 0.9 million
     print(f'Downloading historical daily stock data...')
     n2 = n1 + 350
-    hist = quandl.get_table('SHARADAR/SEP', ticker=tickers[n1: n2], paginate=True)
+    hist = nasdaqdatalink.get_table('SHARADAR/SEP', ticker=tickers[n1: n2], paginate=True)
     hists.append(hist)
     n1 = n2
 

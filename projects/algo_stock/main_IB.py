@@ -1,5 +1,5 @@
 import pandas as pd
-from algo import Algo
+from quantsuite.trader import Algo
 from ib_insync import IB, IBC
 import datetime
 
