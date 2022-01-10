@@ -1,10 +1,12 @@
-from sklearn.preprocessing import RobustScaler
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-from sklearn.compose import ColumnTransformer
-from quantsuite.forcaster.transformers import Winsorizer
-from quantsuite.config.auto_ml import auto_ml_config
 from typing import List
+
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import RobustScaler
+
+from quantsuite.config.auto_ml import auto_ml_config
+from quantsuite.forcaster.transformers import Winsorizer
 
 
 class Pipe:
@@ -33,7 +35,3 @@ class Pipe:
     def get_params(self):
         model_params = auto_ml_config[self.model_str]['params']
         return {'model__' + key: value for key, value in model_params.items()}
-
-
-
-

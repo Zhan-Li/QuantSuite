@@ -11,9 +11,11 @@ from sklearn.inspection import PartialDependenceDisplay, permutation_importance
 from sklearn.metrics import mean_squared_error
 from sqlalchemy import MetaData, Table
 from tpot import TPOTRegressor
+
+from quantsuite.forcaster.scorer import IC
 from quantsuite.performance_evaluation import PerformanceEvaluation
 from quantsuite.portfolio_analysis import PortfolioAnalysis
-from quantsuite.forcaster.scorer import  IC
+
 
 class TrainTestSplitter:
     """Split time series into train test datasets"""
@@ -82,12 +84,12 @@ class CustomCV:
             i = i + window_step
         return cv
 
-    def gen_train_pred_index(self,train_window_size: int, pred_window_size: int, window_step,
+    def gen_train_pred_index(self, train_window_size: int, pred_window_size: int, window_step,
                              moving_window: bool = True, print_index: bool = True):
         train_pred_index = self.gen_cv_index(train_window_size, pred_window_size, window_step, moving_window)
         if print_index:
-            print(f'The first train index is: \n { self.data.iloc[train_pred_index[0][0]].index}')
-            print(f'The first pred index is: \n { self.data.iloc[train_pred_index[0][1]].index}')
+            print(f'The first train index is: \n {self.data.iloc[train_pred_index[0][0]].index}')
+            print(f'The first pred index is: \n {self.data.iloc[train_pred_index[0][1]].index}')
         return train_pred_index
 
 
@@ -111,7 +113,7 @@ class Forecaster:
         self.perf = None
 
     def search(self, params, pipeline, scoring, n_trial, max_search_seconds, n_jobs=-1, use_gpu=False,
-               save_result = True, file_name = 'ray_best_pipeline.pkl',
+               save_result=True, file_name='ray_best_pipeline.pkl',
                verbose=2):
         """
         ray tune search using scikit API

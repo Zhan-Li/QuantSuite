@@ -1,8 +1,9 @@
-from binance.client import Client
 import datetime
 import re
-import pandas as pd
 from typing import List
+
+import pandas as pd
+from binance.client import Client
 
 
 # [
@@ -43,9 +44,9 @@ def convert_to_dataframe(klines):
 
 
 def download_symbols(binance_client: Client, denomination='USDT'):
-    pattern = '[A-Z]{2,}'+denomination
+    pattern = '[A-Z]{2,}' + denomination
     prices = binance_client.get_all_tickers()
-    symbols=[]
+    symbols = []
     for i in prices:
         symbol_search = re.search(pattern, i['symbol'])
         if symbol_search:
@@ -56,36 +57,34 @@ def download_symbols(binance_client: Client, denomination='USDT'):
         symbols.remove('INCH' + denomination)
         symbols.append('1INCH' + denomination)
     FIAT_mkt = ['USDT', 'BKRW', 'BUSD', 'EUR', 'TUSD', 'USDC', 'TRY', 'PAX', 'AUD', 'BIDR', 'BRL', 'DAI', 'GBP',
-                    'IDRT',
-                    'NGN', 'RUB', 'ZAR', 'UAH', 'BVND']
+                'IDRT',
+                'NGN', 'RUB', 'ZAR', 'UAH', 'BVND']
     FIAT_symbols = [i + 'USDT' for i in FIAT_mkt]
     return [symbol for symbol in symbols if symbol not in FIAT_symbols]
 
 
-
-
 def get_number_of_coins(binance_client: Client):
-    BNB_mkt=['BNB']
-    BTC_mkt=['BTC']
-    ALTS_mkt=['ETH', 'TRX', 'XRP']
-    FIAT_mkt=['USDT', 'BKRW', 'BUSD', 'EUR', 'TUSD', 'USDC', 'TRY', 'PAX', 'AUD', 'BIDR', 'BRL', 'DAI', 'GBP', 'IDRT',
-              'NGN', 'RUB', 'ZAR', 'UAH', 'BVND']
-    denominations=[]
-    counts=[]
-    clean_symbols =[]
-    for denomination in BNB_mkt+BTC_mkt+ALTS_mkt+FIAT_mkt:
+    BNB_mkt = ['BNB']
+    BTC_mkt = ['BTC']
+    ALTS_mkt = ['ETH', 'TRX', 'XRP']
+    FIAT_mkt = ['USDT', 'BKRW', 'BUSD', 'EUR', 'TUSD', 'USDC', 'TRY', 'PAX', 'AUD', 'BIDR', 'BRL', 'DAI', 'GBP', 'IDRT',
+                'NGN', 'RUB', 'ZAR', 'UAH', 'BVND']
+    denominations = []
+    counts = []
+    clean_symbols = []
+    for denomination in BNB_mkt + BTC_mkt + ALTS_mkt + FIAT_mkt:
         symbols = download_symbols(binance_client, denomination)
         denomination_removed = [re.search('(.*)' + denomination, symbol).group(1) for symbol in symbols]
         clean_symbols.extend(denomination_removed)
         denominations.append(denomination)
         counts.append(len(symbols))
-    return list(set(clean_symbols)),\
-        pd.DataFrame({'denomination':denominations, 'count': counts}).sort_values('count', ascending=False)
+    return list(set(clean_symbols)), \
+           pd.DataFrame({'denomination': denominations, 'count': counts}).sort_values('count', ascending=False)
 
 
-def download_hist(binance_client: Client, symbols:List[str], interval=Client.KLINE_INTERVAL_12HOUR,
+def download_hist(binance_client: Client, symbols: List[str], interval=Client.KLINE_INTERVAL_12HOUR,
                   start_str="1 Jan, 2009", end_str=None, output='data/crypto.parquet'):
-    data=pd.DataFrame()
+    data = pd.DataFrame()
     for symbol in symbols:
         print(f'Downloading data for {symbol}')
         klines = binance_client.get_historical_klines(symbol, interval, start_str, end_str, limit=1000)
@@ -94,8 +93,8 @@ def download_hist(binance_client: Client, symbols:List[str], interval=Client.KLI
             klines_df = klines_df.drop_duplicates('open_time', keep='last')
             klines_df['symbol'] = symbol
             klines_df['r'] = klines_df['open'].pct_change()
-            col_arranged=['symbol', 'open_time', 'close_time', 'r']
-            klines_df=klines_df.reindex(col_arranged + [i for i in klines_df.columns if i not in col_arranged], axis=1)
-            data=data.append(klines_df)
+            col_arranged = ['symbol', 'open_time', 'close_time', 'r']
+            klines_df = klines_df.reindex(col_arranged + [i for i in klines_df.columns if i not in col_arranged],
+                                          axis=1)
+            data = data.append(klines_df)
     return data.to_parquet(output, index=False)
-

@@ -1,15 +1,15 @@
-
-from polygon import RESTClient
-import nasdaqdatalink
-import json
-import pandas as pd
-from datetime import date, timedelta
-import pandas_market_calendars as  mcal
-import numpy as np
-from ib_insync import util, Stock, Order
-import yagmail
 import datetime
+import json
 import time
+from datetime import date, timedelta
+
+import nasdaqdatalink
+import numpy as np
+import pandas as pd
+import pandas_market_calendars as mcal
+import yagmail
+from ib_insync import util, Stock, Order
+from polygon import RESTClient
 
 
 class Algo:
@@ -68,7 +68,7 @@ class Algo:
         hists = self.download_hist_data(tickers_list)
         t_max = hists.groupby('ticker')['t'].max().to_frame()
         v_avg = hists.groupby('ticker')['v'].mean().to_frame()
-        merged = t_max.merge(v_avg, on=['ticker']).reset_index().rename(columns = {'t': 't_hist', 'v': 'v_hist'})
+        merged = t_max.merge(v_avg, on=['ticker']).reset_index().rename(columns={'t': 't_hist', 'v': 'v_hist'})
         merged = merged.loc[merged['t_hist'] == merged['t_hist'].max()]
         merged.to_pickle('hists_v.pkl')
         # send email report
@@ -86,11 +86,12 @@ class Algo:
         market['v_today'] = market['day'].apply(lambda x: x['v'])
         market['last_price'] = market['lastTrade'].apply(lambda x: x['p'])
         market['ystday_close'] = market['prevDay'].apply(lambda x: x['c'])
-        market['r_hc'] = market['h_today']/market['ystday_close'] - 1
+        market['r_hc'] = market['h_today'] / market['ystday_close'] - 1
         market['r_lc'] = market['l_today'] / market['ystday_close'] - 1
         market['r_oc'] = market['o_today'] / market['ystday_close'] - 1
         market['r_cc'] = market['last_price'] / market['ystday_close'] - 1
-        market['r_avg'] = (market['r_hc'].abs() + market['r_lc'].abs() + market['r_oc'].abs() + market['r_cc'].abs())/4
+        market['r_avg'] = (market['r_hc'].abs() + market['r_lc'].abs() + market['r_oc'].abs() + market[
+            'r_cc'].abs()) / 4
         market['v_d_today'] = market['v_today'] * market['last_price']
         market['updated_today'] = pd.to_datetime(market['updated'], unit='ns')
         market = market.loc[market['updated_today'].dt.date == date.today()]
@@ -106,20 +107,21 @@ class Algo:
             last_trading_day = trading_days['market_close'].iloc[-2].date()
             if len(hist_avg['t_hist'].unique()) != 1 or \
                     hist_avg['t_hist'].min().date() != last_trading_day or \
-                    hist_avg['v_hist'].min() < 0 or\
+                    hist_avg['v_hist'].min() < 0 or \
                     len(hist_avg) < 5000:
                 raise ValueError('History data check failed')
             else:
-                print('Data stamp:', hist_avg['t_hist'].min(), 'Total number of tickers:', len(hist_avg['ticker'].unique()))
+                print('Data stamp:', hist_avg['t_hist'].min(), 'Total number of tickers:',
+                      len(hist_avg['ticker'].unique()))
         market = self.download_live_data()
         merged = market.merge(hist_avg, on='ticker')
-        merged = merged\
-            .loc[merged['v_d_today'] >= self.best_params['volc_min']]\
+        merged = merged \
+            .loc[merged['v_d_today'] >= self.best_params['volc_min']] \
             .loc[merged['r_avg'].abs() <= self.best_params['return_min']]
-        merged['v_ratio'] = merged['v_today']/merged['v_hist']
+        merged['v_ratio'] = merged['v_today'] / merged['v_hist']
         return merged
 
-    def trade_stock(self, ticker, account, action, quantity, Tif:str):
+    def trade_stock(self, ticker, account, action, quantity, Tif: str):
         """
         :param ticker:
         :param account:
@@ -142,7 +144,7 @@ class Algo:
         self.ib.placeOrder(contract, order)
 
     def sell_current_positions(self):
-        self.ib.reqPositions() # you need this to update your positions after trading
+        self.ib.reqPositions()  # you need this to update your positions after trading
         current_positions = util.df(self.ib.positions())
         util.df(self.ib.reqPositions())
         current_positions['ticker'] = current_positions['contract'].apply(lambda x: x.symbol)
@@ -161,7 +163,7 @@ class Algo:
                                  quantity=np.abs(int(row['current_position'])), Tif='DTC')
             time.sleep(1)
 
-    def get_target_positions(self, account_pct = 0.95):
+    def get_target_positions(self, account_pct=0.95):
         account_values = util.df(self.ib.accountValues())
         account_values = account_values.loc[(account_values['tag'] == 'ExcessLiquidity')][['account', 'value']]
         account_values['value'] = account_values['value'].astype(float)
@@ -175,12 +177,13 @@ class Algo:
         n = len(accounts)
         v_ratio = self.get_v_ratio()
         target_position = v_ratio.nlargest(n, 'v_ratio')
-        target_position['target_value'] =  total_position/len(target_position)
-        target_position['target_position'] = (target_position['target_value']/target_position['last_price'])\
+        target_position['target_value'] = total_position / len(target_position)
+        target_position['target_position'] = (target_position['target_value'] / target_position['last_price']) \
             .apply(np.floor).astype(int)
         target_position['account'] = accounts
-        return target_position[['account', 'ticker', 'target_value', 'target_position', 'last_price', 'v_ratio', 'r_avg', 'v_d_today']]\
-            .sort_values('v_ratio',ascending=False)
+        return target_position[
+            ['account', 'ticker', 'target_value', 'target_position', 'last_price', 'v_ratio', 'r_avg', 'v_d_today']] \
+            .sort_values('v_ratio', ascending=False)
 
     def buy_target_positions(self):
         target_position = self.get_target_positions()
@@ -195,27 +198,28 @@ class Algo:
             elif row['target_position'] < 0:
                 action = 'SELL'
             self.trade_stock(ticker, account=row['account'], action=action,
-                       quantity=np.abs(int(row['target_position'])), Tif='DTC')
+                             quantity=np.abs(int(row['target_position'])), Tif='DTC')
             time.sleep(1)
 
     def report(self):
         report = util.df(self.ib.fills())
-        #report = util.df(ib.fills())
-        #report = util.df(ib.trades())
+        # report = util.df(ib.fills())
+        # report = util.df(ib.trades())
         report['ticker'] = report['contract'].apply(lambda x: x.symbol)
         report['shares'] = report['execution'].apply(lambda x: x.shares)
         report['avg_price'] = report['execution'].apply(lambda x: x.avgPrice)
         report['commission'] = report['commissionReport'].apply(lambda x: x.commission)
         report['realizedPNL'] = report['commissionReport'].apply(lambda x: x.realizedPNL)
+
         def aggregate(df):
             d = {}
             d['quantity'] = df['shares'].sum()
-            d['avg_price'] = (df['avg_price']*df['shares']).sum()/d['quantity']
+            d['avg_price'] = (df['avg_price'] * df['shares']).sum() / d['quantity']
             d['commission'] = df['commission'].sum()
             d['realizedPNL'] = df['realizedPNL'].sum()
             return pd.Series(d)
-        report= report.groupby('ticker').apply(aggregate)
+
+        report = report.groupby('ticker').apply(aggregate)
         print('Total comission:', report['commission'].sum())
         print('Total PnL:', report['realizedPNL'].sum())
         return report
-
