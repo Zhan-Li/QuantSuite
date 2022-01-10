@@ -1,6 +1,4 @@
-import binance_functions
 from binance.client import Client
-import pandas as pd
 import binance_functions
 import json
 with open('secret.json') as f:

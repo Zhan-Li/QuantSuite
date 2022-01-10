@@ -1,9 +1,6 @@
-from datetime import datetime
 import time
-import utilities as utils
 import pandas as pd
-from requests import Request, Session
-from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
+from requests import Session
 import json
 from cryptocmd import CmcScraper
 
