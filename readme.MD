@@ -44,7 +44,7 @@ Predict Stock Returns with Machine Learning
 ```python
 from quantsuite.forcaster import Forecaster, CustomCV, TrainTestSplitter, Pipe
 # train test split based on a cut-off date
-train, test = TrainTestSplitter(stock_data).split(test_offset_periods = -12, train_end_time=f'2019-12-31')
+train, test = TrainTestSplitter(stock_data).split(test_offset_periods = -12, train_end_time='2019-12-31')
 x_train, y_train = train.drop(['target'], axis=1), train['target']
 x_test, y_test = test.drop(['target'], axis=1), test['target']
 # Custom cross-validation index, keeping temporal order
