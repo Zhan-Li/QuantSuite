@@ -79,7 +79,7 @@ returns = pa.gen_portr(shift=1, ntile=10, sort_var2='mtk_cap', ntile2=10, depend
 ```
 
 <h2>A Sample Result </h2>
-Backtesting results with looking-ahead bias carefully removed. Plot was generateed in 
+Backtesting a long-short portfolio with looking-ahead bias carefully removed. Plot was generateed in 
 <a href = "https://github.com/ranaroussi/quantstats">QuantStats </a>.
 <ul>
 <li>Model: Random Forest Regressor </li>
