@@ -3,7 +3,7 @@
 QuantSuite is a suite of tools for quantitative research built on PySpark, Ray Tune, Scikit-Learn,
 XGBoost, and TensforFlow.
 </p>
-<p style="text-align: center;">
+<p style="color:blue;; text-align: center;">
 <em>
 Note: This is a private respository for my own use, but made public recently. You should not expect any
 documentation. 
