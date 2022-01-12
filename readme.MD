@@ -5,7 +5,7 @@ XGBoost, and TensforFlow.
 </p>
 
 ```diff
-! This is a private respository for my own use but made public recently. No documentation will be provided. 
+! This is a private respository but made public recently. No documentation will be provided. 
 ```
 
 <h2> Key Features </h2>
