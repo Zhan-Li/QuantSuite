@@ -1,9 +1,9 @@
-<p style="text-align: center;"><h1>QuantSuite</h1></p>
-<p style="text-align: center;">
+<p align="center"><h1>QuantSuite</h1></p>
+<p align="center">
 QuantSuite is a suite of tools for quantitative research built on PySpark, Ray Tune, Scikit-Learn,
 XGBoost, and TensforFlow.
 </p>
-<p style="color:blue;; text-align: center;">
+<p align="center">
 <em>
 Note: This is a private respository for my own use, but made public recently. You should not expect any
 documentation. 
@@ -90,7 +90,7 @@ Backtesting results with looking-ahead bias carefully removed. Plot was generate
 <li>Signals: Extracted from OptionMetrics </li>
 <li>Balance Schedule: Monthly </li>
 <li>Transaction Costs: Not accounted for </li>
-<li>Number of Sampled Hyperparameters: 100 </li>
+<li>Number of hyperparameter samples: 100 </li>
 <li>Look back periods: 12 months </li>
 </ul>
 <img src = "https://github.com/Zhan-Li/QuantSuite/blob/711f7c4d8c8c76b596a118e3ecef835fd177443c/sample_results.png" alt = "">
