@@ -1,14 +1,14 @@
-<center><h1>QuantSuite</h1></center>
-<center>
+<p style="text-align: center;"><h1>QuantSuite</h1></p>
+<p style="text-align: center;">
 QuantSuite is a suite of tools for quantitative research built on PySpark, Ray Tune, Scikit-Learn,
 XGBoost, and TensforFlow.
-</center>
-<div style="text-align: center;">
+</p>
+<p style="text-align: center;">
 <em>
 Note: This is a private respository for my own use, but made public recently. You should not expect any
 documentation. 
 </em>
-</div>
+</p>
 
 <h2> Key Features </h2>
 <ul>
