@@ -8,7 +8,7 @@ XGBoost, and TensforFlow.
 This is a private respository for my own use but made public recently. No documentation will be provided. 
 </em>
 </p>
-<span style="color:blue">some *blue* text</span>.
+<span style="color:blue">some *blue* text</span>.f
 
 
 <h2> Key Features </h2>
