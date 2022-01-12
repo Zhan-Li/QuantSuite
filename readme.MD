@@ -1,4 +1,4 @@
-<p align="center"><h1>QuantSuite</h1></p>
+<h1 align="center">QuantSuite</h1>
 <p align="center">
 QuantSuite is a suite of tools for quantitative research built on PySpark, Ray Tune, Scikit-Learn,
 XGBoost, and TensforFlow.
