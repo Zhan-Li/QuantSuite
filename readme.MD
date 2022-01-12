@@ -5,10 +5,11 @@ XGBoost, and TensforFlow.
 </p>
 <p align="center">
 <em>
-Note: This is a private respository for my own use, but made public recently. You should not expect any
-documentation. 
+This is a private respository for my own use but made public recently. No documentation will be provided. 
 </em>
 </p>
+<span style="color:blue">some *blue* text</span>.
+
 
 <h2> Key Features </h2>
 <ul>
