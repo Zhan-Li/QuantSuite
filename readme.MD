@@ -1,8 +1,8 @@
-<div style="text-align: center;"><h1>QuantSuite</h1></div>
-<div style="text-align: center;">
+<center><h1>QuantSuite</h1></center>
+<center>
 QuantSuite is a suite of tools for quantitative research built on PySpark, Ray Tune, Scikit-Learn,
 XGBoost, and TensforFlow.
-</div>
+</center>
 <div style="text-align: center;">
 <em>
 Note: This is a private respository for my own use, but made public recently. You should not expect any
@@ -39,8 +39,10 @@ stock_sigs = TechnicalSignal(stock, 'date', 'cusip') \
     .add_drawdown('ret', 'drawdown')\
     .add_spread('bid', 'ask', 'spread_daily').data
 ```
+
 <h3>Stock Return Prediction</h3>
 Predict Stock Returns with Machine Learning
+
 ```python
 from quantsuite.forcaster import Forecaster, CustomCV, TrainTestSplitter, Pipe
 # train test split based on a cut-off date
@@ -63,8 +65,10 @@ rf.search(params, model, scoring = 'IC', n_trial=1000, max_search_seconds=2 * 60
 # predict with the best hyperparameter
 rf.predict(x_test, y_test, train_pred_index, 'date', 'daily')
 ```
+
 <h3>Performance Evaluation</h3>
 Evaluating signal performance with portfolio sorts
+
 ```python
 from quantsuite import PortfolioAnalysis
 pa = PortfolioAnalysis(stock_data, time='date', name = 'cusip', sig='my_signal', forward_r='forward_r')
@@ -75,6 +79,7 @@ returns = pa.gen_portr(shift=1, ntile=10, sort_var2='mtk_cap', ntile2=10, depend
 # 10X10 dependent double sort
 returns = pa.gen_portr(shift=1, ntile=10, sort_var2='mtk_cap', ntile2=10, dependent_sort=True)
 ```
+
 <h2>A Sample Result </h2>
 Backtesting results with looking-ahead bias carefully removed. Plot was generateed in 
 <a href = "https://github.com/ranaroussi/quantstats">QuantStats </a>.
