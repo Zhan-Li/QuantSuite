@@ -95,7 +95,7 @@ class TechnicalSignal:
             .drop('indicator')
         return self
 
-    def add_value_average_ratio(self, value, start, end, ratio: str):
+    def add_time_series_ratio(self, value, start, end, ratio: str):
         """today'value divided by past average value
         Test result: Success!
         """
