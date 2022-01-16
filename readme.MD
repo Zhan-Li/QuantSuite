@@ -10,10 +10,10 @@ XGBoost, and TensforFlow.
 
 <h2> Key Features</h2>
 <ul>
-<li><a href="https://github.com/Zhan-Li/QuantSuite/tree/master/quantsuite/data_processor" target="_blank">quantsuite.data_processor</a>: Data process for WRDS databases</li>
+<li><a href="https://github.com/Zhan-Li/QuantSuite/tree/master/quantsuite/data_processor" target="_blank">quantsuite.data_processor</a>: Data processor for WRDS databases</li>
 <li><a href="https://github.com/Zhan-Li/QuantSuite/tree/master/quantsuite/downloader" target="_blank">quantsuite.downloader</a>: Financial data downloader</li>
 <li><a href="https://github.com/Zhan-Li/QuantSuite/tree/master/quantsuite/signals" target="_blank">quantsuite.signals</a>: Extract stock trading signals</li>
-<li><a href="https://github.com/Zhan-Li/QuantSuite/tree/master/quantsuite/forcaster" target="_blank">quantsuite.forcaster</a>: Costomized hyperparameter searching and return prediction </li>
+<li><a href="https://github.com/Zhan-Li/QuantSuite/tree/master/quantsuite/forcaster" target="_blank">quantsuite.forcaster</a>: Customized hyperparameter searching and return prediction </li>
 <li><a href="https://github.com/Zhan-Li/QuantSuite/blob/e40c1440dceb75c9e596535d9466fa3ea6810df5/quantsuite/portfolio_analysis.py" target="_blank">quantsuite.portfolio_analysis</a>: Portfolio analysis and performance evaluation</li>
 <li><a href="https://github.com/Zhan-Li/QuantSuite/tree/master/quantsuite/trader" target="_blank">quantsuite.trader</a>: Trading bots for Binance and Interactive Brokers</li>
 </ul>
