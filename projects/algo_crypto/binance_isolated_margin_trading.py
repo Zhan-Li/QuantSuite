@@ -31,7 +31,6 @@ api_key = 'api_ky'
 api_secret = 'api_secret'
 client = Client(api_key, api_secret)
 sigs = ['avg_sigComov|-10|0_down_20', 'sigcumr|0|0']
-
 # current position
 isolated_margin_account = binance_funcs.get_isolated_margin_account(client, 'USDT')
 currentPosition = isolated_margin_account[['symbol', 'base_netAssetOfQuote']]
