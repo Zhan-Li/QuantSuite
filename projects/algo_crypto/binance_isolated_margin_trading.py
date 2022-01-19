@@ -27,8 +27,8 @@ spark_conf = SparkConf() \
     .set('spark.executor.extraJavaOptions', '-Duser.timezone=UTC')
 spark = SparkSession.builder.config(conf=spark_conf).getOrCreate()
 # binance API
-api_key = 'VvP4uzOCo9kaSOIZX16FRxZOa65wwsOmWP6P5C4ADWgS9fOWxUWzPv7GGIIsveSO'
-api_secret = 'NjBljwWg5tCqgsDJtDSnRMbkrcYE7t1CNqzBj9OQdTAR7U4aGkvTIQQfiKzV0w0Q'
+api_key = 'api_ky'
+api_secret = 'api_secret'
 client = Client(api_key, api_secret)
 sigs = ['avg_sigComov|-10|0_down_20', 'sigcumr|0|0']
 
