@@ -97,7 +97,6 @@ class Forecaster:
     """
     Wrapper around sklearn and tpot, tailored for time-series return prediction.
     """
-
     scorers = {'IC': IC}
 
     def __init__(self, x_train, y_train, cv_train):
@@ -142,6 +141,10 @@ class Forecaster:
         if save_result:
             with open(file_name, 'wb') as file:
                 pickle.dump(search.best_estimator_, file)
+
+    def search_tf(self):
+        return
+
 
     def autoML_tpot(self, config_dict, n_jobs, generations=100, scoring='neg_mean_squared_error', max_time_mins=None,
                     max_eval_time_mins=30, save_pipeline=False, file_name=None):
