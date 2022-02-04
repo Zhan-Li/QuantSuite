@@ -96,7 +96,6 @@ binance_funcs.order(client, base_symbol, target_position)
 #     binance_funcs.order(client, base_symbol, 0,filters)
 
 from binance import BinanceSocketManager
-
 bm = BinanceSocketManager(client)
 
 
