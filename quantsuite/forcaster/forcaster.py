@@ -340,7 +340,7 @@ class TensorFlowForcaster:
         avg_val_score, _ = self.__train(config)
         tune.report(best_val_score=avg_val_score)
 
-    def search(self, X, y, cv, params, n_trial, n_paralles=10, verbose=2):
+    def search(self, X, y, cv, params, n_trial, n_jobs=10, verbose=2):
         params['X'], params['y'], params['cv'] = X, y, cv
         analysis = tune.run(
             self.__objective,
@@ -349,16 +349,26 @@ class TensorFlowForcaster:
             num_samples=n_trial,
             resources_per_trial={
                 "cpu": 0,
-                "gpu": 1 / n_paralles
+                "gpu": 1 / n_jobs
             },
             verbose=verbose,
             config=params)
         return analysis
 
-    def predict(self, X, y, train_pred_split, params):
+    def predict(self, spark, time, freq, X, y, train_pred_split, params):
         params['X'], params['y'], params['cv'] = X, y, train_pred_split
-        avg_score, ys = self.__train(params)
-        return avg_score, ys
+        _, ys = self.__train(params)
+
+        returns = ys.reset_index()
+        returns = spark.createDataFrame(returns).withColumn('name', f.lit('None'))
+        pa = PortfolioAnalysis(returns, time, 'name', 'y_pred', 'y_true')
+        pa.gen_portr(1, 10)
+        r = pa.portr
+        r = r.loc[r['sig_rank'] == 'high_minus_low']['y_true']
+        perf = PerformanceEvaluation(r)
+        self.perf = perf.get_stats(freq)
+        self.port_r = r
+        return r
 
 
 
@@ -408,7 +418,7 @@ if __name__ == '__main__':
         "patience": tune.randint(10, 100),
         "n_layers": tune.randint(1, 5),
         "n_hidden": tune.randint(32, 512),
-        'dropout_rate': tune.uniform(0.1, 0.5)
+        'dropout_rate': tune.uniform(0, 0.5)
     }
 
     cv_train = list(KFold(n_splits=5, shuffle=True).split(train_features, train_labels))
