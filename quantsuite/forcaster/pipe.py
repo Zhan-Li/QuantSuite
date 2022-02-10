@@ -27,6 +27,8 @@ class Pipe:
             ])
 
     def build_pipline(self):
+        if self.model_str == 'tf_regressor':
+            return self.preprocess()
         return Pipeline(steps=[
             ('preprocessor', self.preprocess()),
             ('model', auto_ml_config[self.model_str]['model'])
@@ -34,4 +36,6 @@ class Pipe:
 
     def get_params(self):
         model_params = auto_ml_config[self.model_str]['params']
+        if self.model_str == 'tf_regressor':
+            return {key: value for key, value in model_params.items()}
         return {'model__' + key: value for key, value in model_params.items()}
