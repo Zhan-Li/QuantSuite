@@ -2,6 +2,8 @@ from ray import tune
 from sklearn.ensemble import *
 from quantsuite.forcaster.model import WeightedAverage
 from sklearn.tree import *
+from xgboost.sklearn import XGBRegressor
+
 auto_ml_config = {
     'random_forest_regressor': {
         'params': {'n_estimators': tune.qrandint(50, 150, 50),
@@ -13,7 +15,7 @@ auto_ml_config = {
         'model': RandomForestRegressor()
     },
 
-    'weighted_average':{
+    'weighted_average': {
         'params': {'thresh': tune.quniform(0.001, 0.02, 0.001)
                    },
         'model': WeightedAverage()},
@@ -26,4 +28,18 @@ auto_ml_config = {
                    },
         'model': AdaBoostRegressor()
     },
+    'xgb_regressor': {
+        'params':
+            {'n_estimators': [100],
+             'max_depth': tune.randint(1, 11),
+             'learning_rate': tune.choice([1e-3, 1e-2, 1e-1, 0.2, 0.5, 0.7, 1.0]),
+             'gamma': tune.uniform(0,1),
+             'min_child_weight': tune.randint(1, 50),
+             'subsample': tune.quniform(0.1, 1, 0.1),
+             'colsample_bytree': tune.quniform(0.1, 1, 0.1),
+             'n_jobs': [1],
+             'verbosity': [0],
+             'objective': ['reg:squarederror']},
+        'model': XGBRegressor()
+    }
 }
