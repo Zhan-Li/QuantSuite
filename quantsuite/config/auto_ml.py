@@ -33,7 +33,7 @@ auto_ml_config = {
             {'n_estimators': [100],
              'max_depth': tune.randint(1, 11),
              'learning_rate': tune.choice([1e-3, 1e-2, 1e-1, 0.2, 0.5, 0.7, 1.0]),
-             'gamma': tune.uniform(0,1),
+             'gamma': tune.uniform(0, 1),
              'min_child_weight': tune.randint(1, 50),
              'subsample': tune.quniform(0.1, 1, 0.1),
              'colsample_bytree': tune.quniform(0.1, 1, 0.1),
@@ -41,5 +41,19 @@ auto_ml_config = {
              'verbosity': [0],
              'objective': ['reg:squarederror']},
         'model': XGBRegressor()
+    },
+    'tf_regressor': {
+        'params': {
+            "batch_size": 32,
+            "epochs": 100,
+            "learning_rate": tune.uniform(0.001, 0.01),
+            "momentum": tune.uniform(0.1, 0.9),
+            "patience": tune.choice([100]),
+            "n_layers": tune.randint(1, 5),
+            "n_hidden": tune.qrandint(32, 32*4, 32),
+            'dropout_rate': tune.uniform(0, 0.5)
+        },
+        'model': 'None'
     }
+
 }
