@@ -16,6 +16,19 @@ from quantsuite.forcaster.scorer import IC
 from quantsuite.performance_evaluation import PerformanceEvaluation
 from quantsuite.portfolio_analysis import PortfolioAnalysis
 from ray.tune.schedulers import ASHAScheduler
+from keras.callbacks import EarlyStopping
+from ray import tune
+
+
+def plot_feature_importances(trees, feature_names):
+    importance = [tree.feature_importances_ for tree in trees]
+    mean, std = np.mean(importance, axis=0), np.std(importance, axis=0)
+    mean = pd.Series(mean, index=feature_names)
+    fig, ax = plt.subplots()
+    mean.sort_values().plot.barh(xerr=std, ax=ax)
+    ax.set_title("Feature importances")
+    ax.set_xlabel("Mean decrease in metric")
+    fig.tight_layout()
 
 
 class TrainTestSplitter:
@@ -146,7 +159,6 @@ class Forecaster:
     def search_tf(self):
         return
 
-
     def autoML_tpot(self, config_dict, n_jobs, generations=100, scoring='neg_mean_squared_error', max_time_mins=None,
                     max_eval_time_mins=30, save_pipeline=False, file_name=None):
         """auto-ml with tpot."""
@@ -269,12 +281,138 @@ class Forecaster:
         print(f'Sucessfully inserted records into table {table}')
 
 
-def plot_feature_importances(trees, feature_names):
-    importance = [tree.feature_importances_ for tree in trees]
-    mean, std = np.mean(importance, axis=0), np.std(importance, axis=0)
-    mean = pd.Series(mean, index=feature_names)
-    fig, ax = plt.subplots()
-    mean.sort_values().plot.barh(xerr=std, ax=ax)
-    ax.set_title("Feature importances")
-    ax.set_xlabel("Mean decrease in metric")
-    fig.tight_layout()
+class TensorFlowForcaster:
+
+    def __init__(self, transformer=None):
+        self.transformer = transformer
+
+    def __train(self, config):
+        # get data
+        X, y, cv = config['X'], config['y'], config['cv']
+        # set GPU memory
+        import tensorflow as tf
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        tf.config.experimental.set_memory_growth(gpus[0], True)
+        # build model
+        model = tf.keras.Sequential()
+        for i in range(config['n_layers']):
+            model.add(tf.keras.layers.Dense(units=config['n_hidden'], activation='relu'))
+            model.add(tf.keras.layers.Dropout(config['dropout_rate']))
+        model.add(tf.keras.layers.Dense(1))
+        model.compile(loss=tf.keras.losses.MeanSquaredError(),
+                      optimizer=tf.keras.optimizers.SGD(learning_rate=config['learning_rate'],
+                                                        momentum=config['momentum']),
+                      metrics=["mse"])
+        # train
+        es = EarlyStopping(monitor='val_loss', mode='min', verbose=0, patience=config['patience'])
+        val_scores = []
+        ys = []
+        for train_idx, val_idx in cv:
+            # transorm data
+            if self.transformer:
+                self.transformer.fit(X.iloc[train_idx])
+                x_train = self.transformer.transform(X.iloc[train_idx])
+                x_val = self.transformer.transform(X.iloc[val_idx])
+            else:
+                x_train = X.iloc[train_idx]
+                x_val = X.iloc[val_idx]
+
+            model.fit(
+                x_train,
+                y.iloc[train_idx],
+                batch_size=config['batch_size'],
+                epochs=config['epochs'],
+                verbose=0,
+                # validation_split= 0.2,
+                validation_data=(x_val, y.iloc[val_idx]),
+                callbacks=[es])
+            y_slice = y.iloc[val_idx].to_frame(name='y_true')
+            y_slice['y_pred'] = model(x_val).numpy()
+            ys.append(y_slice)
+
+        m = tf.keras.metrics.MeanSquaredError()
+        m.update_state(y_slice['y_true'], y_slice['y_pred'])
+        val_scores.append(m.result().numpy())
+        avg_val_score = sum(val_scores) / len(val_scores)
+        return avg_val_score, pd.concat(ys, axis=0)
+
+    def __objective(self, config):
+        avg_val_score, _ = self.__train(config)
+        tune.report(best_val_score=avg_val_score)
+
+    def search(self, X, y, cv, params, n_trial, n_paralles=10, verbose=2):
+        params['X'], params['y'], params['cv'] = X, y, cv
+        analysis = tune.run(
+            self.__objective,
+            metric="best_val_score",
+            mode="min",
+            num_samples=n_trial,
+            resources_per_trial={
+                "cpu": 0,
+                "gpu": 1 / n_paralles
+            },
+            verbose=verbose,
+            config=params)
+        return analysis
+
+    def predict(self, X, y, train_pred_split, params):
+        params['X'], params['y'], params['cv'] = X, y, train_pred_split
+        avg_score, ys = self.__train(params)
+        return avg_score, ys
+
+
+
+if __name__ == '__main__':
+    from sklearn.model_selection import KFold
+    from quantsuite.forcaster import Pipe
+
+    url = 'http://archive.ics.uci.edu/ml/machine-learning-databases/auto-mpg/auto-mpg.data'
+    column_names = ['MPG', 'Cylinders', 'Displacement', 'Horsepower', 'Weight',
+                    'Acceleration', 'Model Year', 'Origin']
+
+    raw_dataset = pd.read_csv(url, names=column_names,
+                              na_values='?', comment='\t',
+                              sep=' ', skipinitialspace=True)
+
+    dataset = raw_dataset.copy()
+    dataset = dataset.dropna()
+    dataset['Origin'] = dataset['Origin'].map({1: 'USA', 2: 'Europe', 3: 'Japan'})
+    dataset = pd.get_dummies(dataset, columns=['Origin'], prefix='', prefix_sep='')
+    train_dataset = dataset.sample(frac=0.8, random_state=0)
+    test_dataset = dataset.drop(train_dataset.index)
+    train_features = train_dataset.copy()
+    test_features = test_dataset.copy()
+    train_labels = train_features.pop('MPG')
+    test_labels = test_features.pop('MPG')
+
+    preprocessor = Pipe(model_str='None', num_cols=train_features.columns.to_list()).preprocess()
+
+    # K-fold Cross Validation model evaluation
+
+    config = {
+        "batch_size": 32,
+        "epochs": 100,
+        "lr": 0.01,
+        "momentum": 0.1,
+        "patience": 10,
+        "n_layers": 2,
+        "n_hidden": 32,
+        'dropout_rate': 0.1
+    }
+
+    config = {
+        "batch_size": 32,
+        "epochs": 100,
+        "learning_rate": tune.uniform(0.001, 0.01),
+        "momentum": tune.uniform(0.1, 0.9),
+        "patience": tune.randint(10, 100),
+        "n_layers": tune.randint(1, 5),
+        "n_hidden": tune.randint(32, 512),
+        'dropout_rate': tune.uniform(0.1, 0.5)
+    }
+
+    cv_train = list(KFold(n_splits=5, shuffle=True).split(train_features, train_labels))
+    cv_test = list(KFold(n_splits=5, shuffle=True).split(test_labels, test_labels))
+    TFF = TensorFlowForcaster(transformer=preprocessor)
+    res = TFF.search(train_features, train_labels, cv_train, config, 10, 10, verbose = 2)
+    TFF.predict(test_features, test_labels, cv_test, res.best_config)
