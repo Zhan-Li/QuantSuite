@@ -15,6 +15,7 @@ from tpot import TPOTRegressor
 from quantsuite.forcaster.scorer import IC
 from quantsuite.performance_evaluation import PerformanceEvaluation
 from quantsuite.portfolio_analysis import PortfolioAnalysis
+from ray.tune.schedulers import ASHAScheduler
 
 
 class TrainTestSplitter:
@@ -112,7 +113,7 @@ class Forecaster:
         self.perf = None
 
     def search(self, params, pipeline, scoring, n_trial, max_search_seconds, n_jobs=-1, use_gpu=False,
-               save_result=True, file_name='ray_best_pipeline.pkl',
+               save_result=True, early_stopping=False, file_name='ray_best_pipeline.pkl',
                verbose=2):
         """
         ray tune search using scikit API
@@ -124,10 +125,10 @@ class Forecaster:
             param_distributions=params,
             search_optimization="hyperopt",
             n_trials=n_trial,
-            early_stopping=False,
+            early_stopping=ASHAScheduler() if early_stopping else None,
             scoring=self.scorers[scoring] if type(scoring) == str else scoring,
             cv=self.cv_train,
-            max_iters=1,
+            max_iters=100 if early_stopping else 1,
             verbose=verbose,
             n_jobs=n_jobs,
             time_budget_s=max_search_seconds,
