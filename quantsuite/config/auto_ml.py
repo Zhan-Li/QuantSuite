@@ -46,12 +46,12 @@ auto_ml_config = {
         'params': {
             "batch_size": 32,
             "epochs": 100,
-            "learning_rate": tune.uniform(0.001, 0.01),
-            "momentum": tune.uniform(0.1, 0.9),
+            "learning_rate": tune.quniform(0.005, 0.1, 0.005),
+            "momentum": tune.quniform(0, 0.1, 0.01),
             "patience": tune.choice([100]),
             "n_layers": tune.randint(1, 5),
-            "n_hidden": tune.qrandint(32, 32*4, 32),
-            'dropout_rate': tune.uniform(0, 0.5)
+            "n_hidden": tune.qrandint(32, 32*2, 32),
+            'dropout_rate': tune.quniform(0, 0.5, 0.1)
         },
         'model': 'None'
     }
