@@ -131,10 +131,15 @@ class TechnicalSignal:
             .withColumn(turnover, f.col(volume) / f.col(num_shares))
         return self
 
-    def add_new_high(self, r):
-        self.add_past_cumr(r, Window.unboundedPreceding, Window.currentRow, 'cumr').data \
+    def add_new_high_low(self, r):
+        """
+        new high is 1 and new low is -1
+        """
+        self.add_cumr(r, Window.unboundedPreceding, Window.currentRow, 'cumr').data \
             .withColumn('max_cumr', f.max('cum_r').over(self.window(Window.unboundedPreceding, Window.currentRow))) \
-            .withColumn('new_high')
+            .withColumn('min_cumr', f.min('cum_r').over(self.window(Window.unboundedPreceding, Window.currentRow))) \
+            .withColumn('new_high', f.when(f.col('cum_r') == f.col('max_cumr'), 1).when(f.col('cum_r') == f.col('min_cumr'), -1).otherwise(0))\
+            .drop('max_cumr', 'min_cumr')
         return self
 
     def add_drawdown_speed(self):
