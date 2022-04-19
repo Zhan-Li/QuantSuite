@@ -1,10 +1,8 @@
 import json
-
 import pandas as pd
 import pyspark.sql.functions as f
 from pyspark.conf import SparkConf
 from pyspark.sql import SparkSession
-
 import quantsuite.misc_funcs as utils
 from quantsuite.signals import OptionSignal, TechnicalSignal
 
