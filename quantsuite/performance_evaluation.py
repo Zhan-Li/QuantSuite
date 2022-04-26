@@ -1,6 +1,10 @@
 import pandas as pd
 import numpy as np
 import seaborn as sns
+import quantsuite.misc_funcs as utils
+import statsmodels.api as sm
+from statsmodels.regression.rolling import RollingOLS
+from statsmodels.regression.linear_model import OLS
 
 
 class PerformanceEvaluation:
@@ -61,6 +65,37 @@ class PerformanceEvaluation:
 
         return perfs
 
+    def get_alpha(self, model='FF5', mom=True, freq='daily', window=None):
+        """
+        data: return of sorted portfolio returns per freq(daily, weekly, monthly, annually)
+        model: 'FF3', 'FF5', 'q-factor', 'CAPM'
+        """
+        # download factors
+        if model == 'FF3' or model == 'FF5':
+            factors = utils.get_FF_factors(model, mom, freq)
+        elif model == 'q-factor':
+            factors = utils.get_q_factors(mom, freq)
+        elif model == 'CAPM':
+            factors = utils.get_FF_factors('FF3', False, freq)[['Mkt-RF', 'RF']]
+        # get factor variables
+        if mom is False:
+            factor_cols = [i for i in factors.columns if i != 'Mom' and i != 'RF']
+        elif mom is True:
+            factor_cols = [i for i in factors.columns if i != 'RF']
+        # match returns with factors
+        returns = self.r
+        date_format = {'daily': '%Y%m%d', 'weekly': '%Y%m%d', 'monthly': '%Y%m', 'quarterly': '%Y%m', 'yearly': '%Y'}
+        returns.index = returns.index.strftime(date_format[freq])
+        df = returns.to_frame(name = 'r').merge(factors, left_index=True, right_index=True, how='inner').dropna()
+        df['r_excess'] = df['r'] - df['RF']
+        # regression
+        if window:
+            res = RollingOLS(df['r_excess'], sm.add_constant(df[factor_cols]), window=window)\
+                .fit(cov_type='HAC', cov_kwds={'maxlags': 3})
+        else:
+            res = OLS(df['r_excess'], sm.add_constant(df[factor_cols])) \
+                .fit(cov_type='HAC', cov_kwds={'maxlags': 3})
+        return res.params, res.tvalues, res.pvalues
 
 
 
