@@ -12,7 +12,6 @@ from scipy.stats import ttest_1samp
 from pandas import DataFrame as PandasDataFrame
 from pyspark.sql.types import StringType, IntegerType
 from typing import List
-import re
 
 
 def get_port_r(r_true: pd.Series, r_pred: pd.Series, ntile=10):

@@ -18,7 +18,8 @@ from quantsuite.portfolio_analysis import PortfolioAnalysis
 from ray.tune.schedulers import ASHAScheduler
 from keras.callbacks import EarlyStopping
 from ray import tune
-
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
 def plot_feature_importances(trees, feature_names):
     importance = [tree.feature_importances_ for tree in trees]
@@ -35,10 +36,6 @@ class TrainTestSplitter:
     """Split time series into train test datasets"""
 
     def __init__(self, data: DataFrame):
-        """
-              split train validation data
-              train_size: fraction to used as train
-        """
         if not isinstance(data.index, pd.DatetimeIndex):
             raise Exception('Data index needs to be pd.DatetimeIndex')
         self.data = data
@@ -100,6 +97,9 @@ class CustomCV:
 
     def gen_train_pred_index(self, train_window_size: int, pred_window_size: int, window_step,
                              moving_window: bool = True, print_index: bool = True):
+        """
+        generate train-prediction index at the test stage
+        """
         train_pred_index = self.gen_cv_index(train_window_size, pred_window_size, window_step, moving_window)
         if print_index:
             print(f'The first train index is: \n {self.data.iloc[train_pred_index[0][0]].index}')
@@ -308,6 +308,7 @@ class TensorFlowForcaster:
         val_scores = []
         ys = []
         for train_idx, val_idx in cv:
+            print('Training on date with indexes', y.iloc[train_idx].index)
             # transorm data
             if self.transformer:
                 self.transformer.fit(X.iloc[train_idx])
@@ -356,6 +357,7 @@ class TensorFlowForcaster:
         return analysis
 
     def predict(self, spark, time, freq, X, y, train_pred_split, params):
+        print('Predicting')
         params['X'], params['y'], params['cv'] = X, y, train_pred_split
         _, ys = self.__train(params)
 
