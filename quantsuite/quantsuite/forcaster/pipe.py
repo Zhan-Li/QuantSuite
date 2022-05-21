@@ -10,16 +10,17 @@ from quantsuite.forcaster.transformers import Winsorizer
 
 
 class Pipe:
-    def __init__(self, model_str: str, num_cols: List[str]):
+    def __init__(self, model_str: str, num_cols: List[str], memory =None):
         self.model_str = model_str
         self.num_cols = num_cols
+        self.memory = memory
 
     def preprocess(self):
         num_transformer = Pipeline(steps=[
             ('imputer', SimpleImputer(strategy='mean')),
             ('scale', RobustScaler()),
             ('cutoff', Winsorizer(1.5)),  # Cut off at 1.5 IQR)
-        ])
+        ], memory=self.memory)
 
         return ColumnTransformer(
             transformers=[
@@ -32,7 +33,7 @@ class Pipe:
         return Pipeline(steps=[
             ('preprocessor', self.preprocess()),
             ('model', auto_ml_config[self.model_str]['model'])
-        ])
+        ], memory=self.memory)
 
     def get_params(self):
         model_params = auto_ml_config[self.model_str]['params']
