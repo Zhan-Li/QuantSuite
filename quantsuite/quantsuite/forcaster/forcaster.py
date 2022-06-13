@@ -120,10 +120,7 @@ class Forecaster:
         self.best_params = None
         self.best_pipeline = None
         self.best_score = None
-        self.y_test_true = None
-        self.y_test_pred = None
         self.test_score = None
-        self.perf = None
 
     def search(self, params, pipeline, scoring, n_trial, max_search_seconds, n_jobs=-1, use_gpu=False,
                save_result=True, early_stopping=False, file_name='ray_best_pipeline.pkl',
@@ -155,9 +152,6 @@ class Forecaster:
         if save_result:
             with open(file_name, 'wb') as file:
                 pickle.dump(search.best_estimator_, file)
-
-    def search_tf(self):
-        return
 
     def autoML_tpot(self, config_dict, n_jobs, generations=100, scoring='neg_mean_squared_error', max_time_mins=None,
                     max_eval_time_mins=30, save_pipeline=False, file_name=None):
@@ -201,16 +195,16 @@ class Forecaster:
 
         return plot_partial_dependence(), plot_permutation_importance()
 
-    def predict(self, spark, X, y, train_predict_index, time: str, freq: str, model=None):
+    def predict(self, X, y, train_predict_index, scoring, model=None):
         """
         backtest equal weighted long-short portfolio performance on the test dataset.
 
         Parameters
         ----------
-        spark: pyspark object
         X : features
         y : target, pd.series with time index
         train_predict_index : index for train, predict.
+        scoring: scorer or scorer string
         model : model has higher priority than self.best_pipeline. That is, If model and fitted_best_pipeline are both
             supplied, fitted_best pipeline will be used instead. If model is None, then fitted best_pipeline
             will be used. Note that best_pipeline from automl_tpot cannot be used because tpot pipeline does not include
@@ -229,7 +223,7 @@ class Forecaster:
         else:
             raise Exception('Either model needs to be supplied or best_pipeline needs to provided by search')
 
-        self.y_test_true = pd.concat([y.iloc[predict_index] for train_index, predict_index in train_predict_index])
+        y_test_true = pd.concat([y.iloc[predict_index] for train_index, predict_index in train_predict_index])
 
         if type(X) == np.ndarray:
             y_test_pred = [estimator.fit(X[train_index], y.iloc[train_index]).predict(X[predict_index])
@@ -239,19 +233,12 @@ class Forecaster:
                            for train_index, predict_index in train_predict_index]
         else:
             raise TypeError('X is either numpy.ndarray or pd.DataFrame')
-        self.y_test_pred = pd.Series(np.concatenate(y_test_pred), index=self.y_test_true.index)
 
-        self.test_score = -mean_squared_error(self.y_test_true, self.y_test_pred)
+        score = self.scorers[scoring] if type(scoring) == str else scoring
 
-        returns = pd.DataFrame({'y_true': self.y_test_true, 'y_pred': self.y_test_pred}).reset_index()
-        returns = spark.createDataFrame(returns).withColumn('name', f.lit('None'))
-        pa = PortfolioAnalysis(returns, time, 'name', 'y_pred', 'y_true')
-        pa.gen_portr(1, 10)
-        r = pa.portr
-        r = r.loc[r['sig_rank'] == 'high_minus_low']['y_true']
-        perf = PerformanceEvaluation(r)
-        self.perf = perf.get_stats(freq)
-        self.port_r = r
+        y_test_pred = pd.Series(np.concatenate(y_test_pred), index=y_test_true.index)
+        self.test_score = score(y_test_true, y_test_pred)
+        self.returns = pd.DataFrame({'y_true': y_test_true, 'y_pred': y_test_pred}).reset_index()
 
     def insert_to_db(self, dataset_names: List[str], sample_start: str, sample_end: str, sample_freq: str,
                      model_name: str, table: str, db_con):
