@@ -7,7 +7,7 @@ class EDA:
     def __init__(self, df):
         self.df = df
 
-    def describe_numerical(self, num_cols:List[str], long=False):
+    def describe(self, num_cols:List[str], long=False):
         data = self.df[num_cols]
         summary = data.describe()
         summary.loc['skew', :] = data.skew(numeric_only=True).tolist()
@@ -20,7 +20,7 @@ class EDA:
         else:
             return summary
 
-    def describe_all(self, long=False):
+    def info(self, long=False):
         res = pd.DataFrame({
                             'dtypes': self.df.dtypes.tolist(),
                             'unique_values': self.df.nunique().tolist(),
