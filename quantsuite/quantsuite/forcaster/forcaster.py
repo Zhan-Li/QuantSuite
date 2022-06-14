@@ -12,7 +12,7 @@ from sklearn.metrics import mean_squared_error
 from sqlalchemy import MetaData, Table
 from tpot import TPOTRegressor
 
-from quantsuite.forcaster.scorer import IC
+from quantsuite.forcaster.scorer import IC, _IC
 from quantsuite.performance_evaluation import PerformanceEvaluation
 from quantsuite.portfolio_analysis import PortfolioAnalysis
 from ray.tune.schedulers import ASHAScheduler
@@ -195,7 +195,7 @@ class Forecaster:
 
         return plot_partial_dependence(), plot_permutation_importance()
 
-    def predict(self, X, y, train_predict_index, scoring, model=None):
+    def predict(self, X, y, train_predict_index, scoring = _IC, model=None):
         """
         backtest equal weighted long-short portfolio performance on the test dataset.
 
@@ -234,10 +234,8 @@ class Forecaster:
         else:
             raise TypeError('X is either numpy.ndarray or pd.DataFrame')
 
-        score = self.scorers[scoring] if type(scoring) == str else scoring
-
         y_test_pred = pd.Series(np.concatenate(y_test_pred), index=y_test_true.index)
-        self.test_score = score(y_test_true, y_test_pred)
+        self.test_score = scoring(y_test_true, y_test_pred)
         self.returns = pd.DataFrame({'y_true': y_test_true, 'y_pred': y_test_pred}).reset_index()
 
     def insert_to_db(self, dataset_names: List[str], sample_start: str, sample_end: str, sample_freq: str,
